@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Author  : minciv
-# @File    : backup_utils.py
+# @File    : README.md
 # @Software: Windsurf
 # @Description: Датотека за упознавање са програмом Кућна Библиотека
 
