@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : biblioteka_gui.py
-# @Version: 0.0.01.01.
-# @Software: Windsurf
-# @Description: Датотека за покретање GUI за Кућну Библиотеку
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import Biblioteka as bib
 from scrollable_frame import ScrollableFrame
+from autocomplete_entry import AutocompleteEntry
 import os
 import json
 from translations import TRANSLATIONS, ICONS
@@ -17,12 +13,6 @@ try:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 except ImportError:
     Figure = None
-# Додајемо Pillow за рад са сликама
-try:
-    from PIL import Image, ImageTk
-except ImportError:
-    Image = None
-    ImageTk = None
 
 # Путања до фајла са подешавањима
 SETTINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
@@ -44,27 +34,11 @@ except ImportError:
     povez = []
     pisci = []
 
-# Увоз статистике
-from statistika import (
-    ukupno_knjiga, ukupno_auta, broj_zanrova, broj_serijala, broj_pozajmica,
-    knjige_po_zanru, knjige_po_izdavacu, top_autori
-)
-
 # Ствара класу Библиотека
 class BibliotekaGUI:
     def __init__(self, root, putanja):
         self.root = root
         self.root.title("Кућна Библиотека")
-        # Постављање иконице апликације ако постоји
-        try:
-            if Image and ImageTk:
-                ikona_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ikona_biblioteka_64.png')
-                if os.path.exists(ikona_path):
-                    ikona_img = Image.open(ikona_path)
-                    self._icon_img = ImageTk.PhotoImage(ikona_img)
-                    self.root.iconphoto(True, self._icon_img)
-        except Exception as e:
-            pass  # Ако нешто не ради, настави без иконице
         self.putanja = putanja
         self.frame_stack = []
         self.current_frame = None
@@ -400,7 +374,7 @@ class BibliotekaGUI:
                         edit_frame = self.create_new_frame()
                         edit_frame.grid_columnconfigure(1, weight=1)
                         tk.Label(edit_frame, text=f"{self._get_label('edit_book_title')} {knjiga['Наслов']}", font=("Helvetica", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
-                        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал", "Колекција", "Издавач", "ИСБН", "Повез", "Напомена", "Позајмљена", "Враћена", "Ко је позајмио"]
+                        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал", "Колекција", "Издавач", "ИСБН", "Напомена", "Позајмљена", "Враћена", "Ко је позајмио"]
                         entries = {}
                         for i, field in enumerate(fields):
                             tk.Label(edit_frame, text=f"{field}:").grid(row=i+1, column=0, padx=5, pady=5)
@@ -423,7 +397,7 @@ class BibliotekaGUI:
                                     row = len(entries_authors)
                                     btn_remove = ttk.Button(authors_container, text="-", width=2, command=lambda r=row: remove_author_field_edit(r))
                                     btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
-                                    entry = ttk.Combobox(authors_container, values=pisci, width=25)
+                                    entry = AutocompleteEntry(pisci, authors_container, width=25)
                                     entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
                                     entry.insert(0, name)
                                     authors_container.grid_rowconfigure(row, weight=0)
@@ -452,16 +426,6 @@ class BibliotekaGUI:
                                 # Додај поље за сваког аутора посебно
                                 for name in existing_authors:
                                     add_author_field_edit(name)
-                                if not existing_authors:
-                                    add_author_field_edit()
-
-                                # Додајемо поље за додавање новог аутора
-                                add_author_frame = tk.Frame(author_section)
-                                add_author_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
-                                add_author_frame.grid_columnconfigure(0, weight=1)
-                                new_author_entry = ttk.Combobox(add_author_frame, values=pisci, width=25)
-                                new_author_entry.grid(row=0, column=0, padx=2, sticky="ew")
-
                                 # Додајемо новог аутора из корисничког поља
                                 def add_new_author_from_entry():
                                     name = new_author_entry.get().strip()
@@ -481,11 +445,6 @@ class BibliotekaGUI:
                                 entries[field] = entry
                             elif field == "Издавач":
                                 entry = ttk.Combobox(edit_frame, values=izdavac, width=25)
-                                entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="ew")
-                                entry.set(knjiga.get(field, ""))
-                                entries[field] = entry
-                            elif field == "Повез":
-                                entry = ttk.Combobox(edit_frame, values=povez, width=25)
                                 entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="ew")
                                 entry.set(knjiga.get(field, ""))
                                 entries[field] = entry
@@ -584,14 +543,12 @@ class BibliotekaGUI:
         for i, field in enumerate(fields):
             tk.Label(frame, text=f"{field}:").grid(row=i+1, column=0, padx=5, pady=5, sticky="e")
             if field == "Писац":
-                # За писце користимо комбобокс
+                # За писце користимо AutocompleteEntry за аутокомплетирање
                 entry = ttk.Combobox(frame, values=pisci, width=25)
             elif field == "Жанр":
                 entry = ttk.Combobox(frame, values=zanr, width=25)
             elif field == "Издавач":
                 entry = ttk.Combobox(frame, values=izdavac, width=25)
-            elif field == "Повез":
-                entry = ttk.Combobox(frame, values=povez, width=25)
             else:
                 entry = tk.Entry(frame, width=25)
             entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="w")
@@ -739,25 +696,10 @@ class BibliotekaGUI:
         settings_menu = tk.Menu(menubar, tearoff=0)
         settings_menu.add_command(label=self._get_label('settings'), command=self.otvori_settings)
         menubar.add_cascade(label=self._get_label('settings'), menu=settings_menu)
-        # Help menu
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label=self._get_label('menu_about_desc'), command=self._show_about_desc)
-        help_menu.add_command(label=self._get_label('menu_about_author'), command=self._show_about_author)
-        help_menu.add_command(label=self._get_label('menu_about'), command=self._show_about_program)
-        menubar.add_cascade(label=self._get_label('menu_help'), menu=help_menu)
         # Back menu
         if hasattr(self, 'current_frame') and self.current_frame is not None and self.current_frame != self.main_frame:
             menubar.add_command(label=self._get_label('back_to_main'), command=self.setup_main_window)
         self.root.config(menu=menubar)
-
-    def _show_about_desc(self):
-        messagebox.showinfo(self._get_label('menu_about_desc'), self._get_label('about_desc'))
-
-    def _show_about_author(self):
-        messagebox.showinfo(self._get_label('menu_about_author'), self._get_label('about_author'))
-
-    def _show_about_program(self):
-        messagebox.showinfo(self._get_label('menu_about'), self._get_label('about_program'))
 
     def otvori_settings(self):
         dialog = tk.Toplevel(self.root)
@@ -791,59 +733,19 @@ class BibliotekaGUI:
         btn_apply.grid(row=3, column=0, columnspan=2, pady=10)
 
     def otvori_statistiku(self):
-        # Израчунава и приказује статистику библиотеке у табовима
+        # Compute and display real statistics
         data = bib.ucitaj_podatke(self.putanja)
-        total = ukupno_knjiga(data)
-        authors = ukupno_auta(data, bib.podeli_pisce)
-        genres = broj_zanrova(data)
-        series = broj_serijala(data)
-        loans = broj_pozajmica(data)
-        knjige_zanr = knjige_po_zanru(data)
-        knjige_izdavac = knjige_po_izdavacu(data)
-        top5 = top_autori(data, bib.podeli_pisce)
+        total = len(data)
+        authors = len(bib.dobavi_sve_pisce(data))
+        genres = len({row.get("Жанр","\"").strip() for row in data if row.get("Жанр","\"").strip()})
+        loans = sum(1 for row in data if row.get("Позајмљена","\"").strip() and not row.get("Враћена","\"").strip())
         frame = self.create_new_frame()
-        # Креирај посебан фрејм за заглавље
-        header_frame = tk.Frame(frame)
-        header_frame.grid(row=0, column=0, sticky="ew")
-        tk.Label(header_frame, text=self._get_label('statistics'), font=("Helvetica",14,"bold")).grid(row=0, column=0, pady=10, sticky="ew")
-        # Таб контрола
-        tab_control = ttk.Notebook(frame)
-        tab_control.grid(row=1, column=0, sticky="nsew")
-        frame.grid_rowconfigure(1, weight=1)
-        frame.grid_columnconfigure(0, weight=1)
-        # --- Опште ---
-        tab_opste = tk.Frame(tab_control)
-        tab_control.add(tab_opste, text=self._get_label('tab_general'))
-        for idx, (label, val) in enumerate([
-            (self._get_label('stat_total_books'), total),
-            (self._get_label('stat_total_authors'), authors),
-            (self._get_label('stat_genres'), genres),
-            (self._get_label('stat_series'), series),
-            (self._get_label('stat_loans'), loans)
-        ]):
-            tk.Label(tab_opste, text=f"{label}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=10, pady=5)
-            tk.Label(tab_opste, text=str(val), anchor='w').grid(row=idx, column=1, sticky="w", padx=10, pady=5)
-        # --- По жанру ---
-        tab_zanr = tk.Frame(tab_control)
-        tab_control.add(tab_zanr, text=self._get_label('tab_genre'))
-        for idx, (zanr, br) in enumerate(sorted(knjige_zanr.items())):
-            tk.Label(tab_zanr, text=f"{zanr}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=20, pady=2)
-            tk.Label(tab_zanr, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", pady=2)
-        # --- По издавачу ---
-        tab_izdavac = tk.Frame(tab_control)
-        tab_control.add(tab_izdavac, text=self._get_label('tab_publisher'))
-        for idx, (izd, br) in enumerate(sorted(knjige_izdavac.items())):
-            tk.Label(tab_izdavac, text=f"{izd}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=20, pady=2)
-            tk.Label(tab_izdavac, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", pady=2)
-        # --- Топ 5 аутора ---
-        tab_autori = tk.Frame(tab_control)
-        tab_control.add(tab_autori, text=self._get_label('tab_top_authors'))
-        for idx, (autor, br) in enumerate(top5):
-            tk.Label(tab_autori, text=f"{autor}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=20, pady=2)
-            tk.Label(tab_autori, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", pady=2)
-        # --- Дијаграм доступности ---
-        tab_dijagram = tk.Frame(tab_control)
-        tab_control.add(tab_dijagram, text=self._get_label('tab_chart'))
+        tk.Label(frame, text=self._get_label('statistics'), font=("Helvetica",14,"bold")).grid(row=0, column=0, columnspan=2, pady=10)
+        stats = [("Укупно књига", total), ("Укупно аутора", authors), ("Жанрова", genres), ("Текућих позајмица", loans)]
+        for idx, (label, val) in enumerate(stats, start=1):
+            tk.Label(frame, text=f"{label}:").grid(row=idx, column=0, sticky="w", padx=10, pady=5)
+            tk.Label(frame, text=str(val)).grid(row=idx, column=1, sticky="w", padx=10, pady=5)
+        # Embed pie chart of availability vs loans
         if Figure:
             labels_chart = [self._get_label('available'), self._get_label('loaned')]
             sizes = [total-loans, loans]
@@ -851,11 +753,11 @@ class BibliotekaGUI:
             ax = fig.add_subplot(111)
             ax.pie(sizes, labels=labels_chart, autopct='%1.1f%%', startangle=90)
             ax.axis('equal')
-            canvas = FigureCanvasTkAgg(fig, master=tab_dijagram)
+            canvas = FigureCanvasTkAgg(fig, master=frame)
             canvas.draw()
-            canvas.get_tk_widget().grid(row=0, column=0, pady=10)
+            canvas.get_tk_widget().grid(row=len(stats)+1, column=0, columnspan=2, pady=10)
         else:
-            tk.Label(tab_dijagram, text=self._get_label('matplotlib_error'), fg="red").grid(row=0, column=0, pady=10)
+            tk.Label(frame, text=self._get_label('matplotlib_error'), fg="red").grid(row=len(stats)+1, column=0, columnspan=2, pady=10)
         self.show_frame(frame)
 
     def _compute_availability(self, knjiga):
@@ -923,7 +825,7 @@ class BibliotekaGUI:
     def otvori_dodavanje(self):
         frame = self.create_new_frame()
         fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал",
-              "Колекција", "Издавач", "ИСБН", "Повез", "Напомена"]
+                  "Колекција", "Издавач", "ИСБН", "Напомена"]
         entries = {}
         entries_authors = []
         
@@ -949,7 +851,7 @@ class BibliotekaGUI:
                     row = len(entries_authors)
                     btn_remove = ttk.Button(authors_container, text="-", width=2, command=lambda r=row: remove_author_field(r))
                     btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
-                    entry = ttk.Combobox(authors_container, values=pisci, width=25)
+                    entry = AutocompleteEntry(pisci, authors_container, width=25)
                     entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
                     entry.insert(0, name)
                     authors_container.grid_rowconfigure(row, weight=0)
@@ -978,7 +880,7 @@ class BibliotekaGUI:
                 add_author_frame = tk.Frame(author_section)
                 add_author_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
                 add_author_frame.grid_columnconfigure(0, weight=1)
-                new_author_entry = ttk.Combobox(add_author_frame, values=pisci, width=25)
+                new_author_entry = AutocompleteEntry(pisci, add_author_frame, width=25)
                 new_author_entry.grid(row=0, column=0, padx=2, sticky="ew")
                 add_author_frame.grid_columnconfigure(0, weight=1)
 
@@ -1000,10 +902,6 @@ class BibliotekaGUI:
                 entry = ttk.Combobox(frame, values=izdavac, width=25)
                 entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
                 entries[field] = entry
-            elif field == "Повез":
-                entry = ttk.Combobox(frame, values=povez, width=25)
-                entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
-                entries[field] = entry
             else:
                 entry = tk.Entry(frame)
                 entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
@@ -1018,7 +916,7 @@ class BibliotekaGUI:
                     # Прикупи све ауторе из појединачних поља и споји их са тачка-запетом
                     authors = [e.get() for e in entries_authors if e.get().strip()]
                     nova_knjiga[field] = "; ".join(authors)
-                elif field in ["Жанр", "Издавач", "Повез"]:
+                elif field in ["Жанр", "Издавач"]:
                     widget = entries[field]
                     value = widget.get() if hasattr(widget, 'get') else widget
                     nova_knjiga[field] = value

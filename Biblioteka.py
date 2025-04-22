@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Author  : minciv
 # @File    : Biblioteka.py
+# @Version: 0.0.01.01.
 # @Software: Windsurf
 # @Description: Датотека за управљање подацима о књигама
 

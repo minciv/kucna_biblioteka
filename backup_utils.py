@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Author  : minciv
 # @File    : backup_utils.py
+# @Version: 0.0.01.01.
 # @Software: Windsurf
 # @Description: Датотека за управљање резервним копијама за Кућну Библиотеку
 
@@ -21,7 +22,7 @@ def ocisti_stare_backup_fajlove(putanja_do_csv, max_backups=MAX_BACKUPS):
     :param max_backups: Максималан број backup фајлова који се чувају
     """
     # Проналазимо све бацкуп фајлове
-    pattern = f"{re.escape(putanja_do_csv)}.backup_*"
+    pattern = f"{putanja_do_csv}.backup_*"
     backup_fajlovi = glob.glob(pattern)
     
     # Сортирамо по времену модификације (најстарији први)

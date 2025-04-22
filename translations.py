@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Author  : minciv
 # @File    : translations.py
+# @Version: 0.0.01.01.
 # @Software: Windsurf
 # @Description: Датотека за покретање GUI за Кућну Библиотеку
 

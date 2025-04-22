@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Author  : minciv
 # @File    : statistika.py
+# @Version: 0.0.01.01.
 # @Description: Помоћне функције за израчунавање статистике у Кућној библиотеци
 
 """

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Назив: Кућна библиотека | Верзија: 0.0.01.01. -->
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Позадина -->
+  <rect x="0" y="0" width="256" height="256" rx="48" fill="#f5ecd7"/>
+
+  <!-- Прашњаве полице -->
+  <rect x="16" y="32" width="224" height="28" rx="6" fill="#b7c7db" opacity="0.5"/>
+  <rect x="24" y="60" width="208" height="18" rx="4" fill="#b7c7db" opacity="0.3"/>
+  <!-- Књиге на полици -->
+  <rect x="32" y="38" width="16" height="18" rx="2" fill="#d6bfa5"/>
+  <rect x="60" y="36" width="12" height="20" rx="2" fill="#bca68b"/>
+  <rect x="80" y="40" width="10" height="16" rx="2" fill="#a8b8c8"/>
+  <rect x="108" y="36" width="16" height="20" rx="2" fill="#e6d3b3"/>
+  <rect x="140" y="38" width="12" height="18" rx="2" fill="#c7b3a1"/>
+  <rect x="168" y="36" width="16" height="20" rx="2" fill="#c7d1e0"/>
+  <rect x="200" y="40" width="12" height="16" rx="2" fill="#bca68b"/>
+  <!-- Прашина -->
+  <ellipse cx="45" cy="52" rx="3" ry="1.5" fill="#fff" opacity="0.5"/>
+  <ellipse cx="155" cy="44" rx="2.5" ry="1" fill="#fff" opacity="0.4"/>
+  <ellipse cx="210" cy="48" rx="2" ry="0.8" fill="#fff" opacity="0.3"/>
+
+  <!-- Сто -->
+  <rect x="32" y="180" width="192" height="32" rx="10" fill="#d6bfa5" stroke="#9d8b71" stroke-width="2"/>
+  <!-- Мрље на столу -->
+  <ellipse cx="60" cy="200" rx="8" ry="2.5" fill="#bca68b" opacity="0.4"/>
+  <ellipse cx="180" cy="210" rx="6" ry="1.5" fill="#bca68b" opacity="0.3"/>
+
+  <!-- Папири на столу -->
+  <rect x="52" y="192" width="40" height="16" rx="3" fill="#fff9e2" stroke="#bca68b" stroke-width="1"/>
+  <rect x="100" y="196" width="28" height="10" rx="2" fill="#fff9e2" stroke="#bca68b" stroke-width="1"/>
+  <rect x="138" y="188" width="34" height="14" rx="2" fill="#fff9e2" stroke="#bca68b" stroke-width="1"/>
+  <rect x="180" y="194" width="28" height="12" rx="2" fill="#fff9e2" stroke="#bca68b" stroke-width="1"/>
+  <!-- Шврљарије и знакови питања -->
+  <text x="62" y="204" font-size="10" fill="#bca68b">???</text>
+  <text x="110" y="204" font-size="8" fill="#bca68b">#?!</text>
+
+  <!-- Књиге на столу -->
+  <rect x="72" y="182" width="18" height="16" rx="2" fill="#b7c7db" stroke="#9d8b71" stroke-width="1"/>
+  <rect x="190" y="186" width="16" height="20" rx="2" fill="#e6d3b3" stroke="#9d8b71" stroke-width="1"/>
+  <rect x="160" y="196" width="14" height="10" rx="2" fill="#bca68b" stroke="#9d8b71" stroke-width="1"/>
+  <!-- Отворена књига -->
+  <rect x="128" y="202" width="18" height="8" rx="2" fill="#fff" stroke="#bca68b" stroke-width="1"/>
+  <line x1="137" y1="202" x2="137" y2="210" stroke="#bca68b" stroke-width="1"/>
+
+  <!-- Мастионица и мрља мастила -->
+  <ellipse cx="110" cy="215" rx="7" ry="5" fill="#3d4e6b"/>
+  <ellipse cx="110" cy="222" rx="5" ry="2" fill="#3d4e6b" opacity="0.5"/>
+  <!-- Перо у мастионици -->
+  <rect x="107" y="205" width="2" height="12" rx="1" fill="#d6bfa5"/>
+  <polygon points="108,205 110,205 109,200" fill="#b7c7db"/>
+
+  <!-- Централни лик: чувар знања -->
+  <!-- Тело -->
+  <ellipse cx="128" cy="150" rx="38" ry="40" fill="#b7c7db"/>
+  <!-- Џемпер -->
+  <ellipse cx="128" cy="170" rx="32" ry="18" fill="#7d90b0"/>
+  <!-- Врат -->
+  <rect x="118" y="140" width="20" height="18" rx="6" fill="#f3e6c6"/>
+  <!-- Глава -->
+  <ellipse cx="128" cy="120" rx="28" ry="26" fill="#f3e6c6" stroke="#bca68b" stroke-width="1.5"/>
+  <!-- Проређена коса -->
+  <ellipse cx="120" cy="110" rx="8" ry="4" fill="#d6bfa5" opacity="0.7"/>
+  <ellipse cx="138" cy="108" rx="6" ry="3" fill="#d6bfa5" opacity="0.5"/>
+  <!-- Наочаре -->
+  <ellipse cx="118" cy="125" rx="8" ry="6" fill="#fff" stroke="#3d4e6b" stroke-width="2"/>
+  <ellipse cx="138" cy="125" rx="8" ry="6" fill="#fff" stroke="#3d4e6b" stroke-width="2"/>
+  <ellipse cx="116" cy="127" rx="2" ry="2" fill="#3d4e6b"/>
+  <ellipse cx="140" cy="127" rx="2" ry="2" fill="#3d4e6b"/>
+  <rect x="126" y="126" width="4" height="2" rx="1" fill="#3d4e6b"/>
+  <!-- Наочаре клизе низ нос -->
+  <rect x="116" y="133" width="16" height="2" rx="1" fill="#3d4e6b" opacity="0.5"/>
+  <!-- Перо иза ува -->
+  <rect x="148" y="115" width="2" height="10" rx="1" fill="#b7c7db"/>
+  <polygon points="149,115 151,115 150,110" fill="#7d90b0"/>
+  <!-- Израз лица: збуњеност -->
+  <ellipse cx="128" cy="135" rx="7" ry="3" fill="#fff"/>
+  <ellipse cx="128" cy="138" rx="4" ry="1.5" fill="#bca68b" opacity="0.5"/>
+  <ellipse cx="120" cy="120" rx="2.5" ry="1.5" fill="#3d4e6b"/>
+  <ellipse cx="136" cy="120" rx="2.5" ry="1.5" fill="#3d4e6b"/>
+  <ellipse cx="124" cy="130" rx="1.5" ry="0.7" fill="#3d4e6b"/>
+  <ellipse cx="132" cy="130" rx="1.5" ry="0.7" fill="#3d4e6b"/>
+  <!-- Подигнуте обрве -->
+  <rect x="115" y="113" width="7" height="2" rx="1" fill="#3d4e6b"/>
+  <rect x="136" y="112" width="7" height="2" rx="1" fill="#3d4e6b"/>
+  <!-- Благо отворена уста -->
+  <ellipse cx="128" cy="143" rx="4" ry="2" fill="#fff" stroke="#bca68b" stroke-width="1"/>
+  <ellipse cx="128" cy="144" rx="2" ry="0.7" fill="#bca68b"/>
+</svg>

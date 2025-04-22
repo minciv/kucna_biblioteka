@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Кућна Библиотека
+Comment=Покретање Python апликације за управљање библиотеком
+Exec=python3 /home/minciv/Документа/Učenje/Python/Biblioteka/kucna_biblioteka.py
+Icon=/home/minciv/Документа/Učenje/Python/Biblioteka/ikona_biblioteka_64.png
+Terminal=false
+Categories=Education;Office;
