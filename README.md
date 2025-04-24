@@ -1,6 +1,6 @@
 ## -*- coding: utf-8 -*-
 ## @Author  : minciv
-## @File    : backup_utils.py
+## @File    : README.md
 ## @Software: Windsurf
 ## @Description: Датотека за упознавање са програмом Кућна Библиотека
 
@@ -63,23 +63,24 @@ Python GUI апликација за вођење евиденције о књи
 minciv  
 minciv@protonmail.com
 
-## пензионер коме је досадило да седи и ништа неради
-## па седе и научи Python и написа програмчић
-## за праћење књига и позајмица
-## јер му је досадило да се присећа
-## коме и када је позајмио књигу
+пензионер коме је досадило да седи и ништа неради
+па седе и научи Python и написа програмчић
+за праћење књига и позајмица
+јер му је досадило да се присећа
+коме и када је позајмио књигу
 
 ## Ово је за оне који "Слабо памте, а брзо заборављају"
 
 ---
 
-## Retired guy who got tired of just sitting and doing nothing
-## so he sat down, learned Python and wrote a little program
-## for tracking books and loans
-## because he was tired of trying to remember
-## to whom and when he lent a book
+Retired guy who got tired of just sitting and doing nothing
+so he sat down, learned Python and wrote a little program
+for tracking books and loans
+because he was tired of trying to remember
+to whom and when he lent a book
 
 ## This is for those who "Remember little and forget quickly"
 
 **Слободно шаљи pull request-ове, пријави баг или предложи нову функцију!**
+
 **Free to send pull requests, report bugs or suggest new features!**
