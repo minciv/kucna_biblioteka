@@ -27,6 +27,10 @@ Python GUI апликација за вођење евиденције о књи
 - Commercial use is NOT allowed (no selling, no use in paid/commercial products or services).
 - Full license text: https://creativecommons.org/licenses/by-nc/4.0/
 
+## Пример Података
+
+Фајл `Biblioteka.csv.example` садржи примере података о књигама и посвећен је јавном домену под Creative Commons Zero v1.0 Universal License.
+
 ## Главне функције
 - Додавање, измена и брисање књига
 - Претрага по разним критеријумима
@@ -63,13 +67,13 @@ Python GUI апликација за вођење евиденције о књи
 minciv  
 minciv@protonmail.com
 
-пензионер коме је досадило да седи и ништа неради
+Пензионер коме је досадило да седи и ништа неради
 па седе и научи Python и написа програмчић
 за праћење књига и позајмица
 јер му је досадило да се присећа
 коме и када је позајмио књигу
 
-## Ово је за оне који "Слабо памте, а брзо заборављају"
+# Ово је за оне који "Слабо памте, а брзо заборављају"
 
 ---
 
@@ -79,7 +83,7 @@ for tracking books and loans
 because he was tired of trying to remember
 to whom and when he lent a book
 
-## This is for those who "Remember little and forget quickly"
+# This is for those who "Remember little and forget quickly"
 
 **Слободно шаљи pull request-ове, пријави баг или предложи нову функцију!**
 
