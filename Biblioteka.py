@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : Biblioteka.py
-# @Version: 0.0.01.01.
-# @Software: Windsurf
-# @Description: Датотека за управљање подацима о књигама
+# @Аутор   : minciv
+# @Фајл     : Biblioteka.py
+# @Верзија  : 0.0.01.02.
+# @Програм  : Windsurf
+# @Опис     : Датотека за управљање подацима о књигама
 
 import os
 import csv
@@ -65,7 +65,21 @@ def inicijalizuj_podatke(putanja_do_csv=None):
     zanr_set = {row.get("Жанр", "").strip() for row in podaci if row.get("Жанр", "").strip() != ""}
     zanr = sorted(list(zanr_set)) if zanr_set else []
     
-    izdavac_set = {row.get("Издавач", "").strip() for row in podaci if row.get("Издавач", "").strip() != ""}
+    # Извлачи издаваче (слично као за писце, подржава вишеструке издаваче)
+    izdavac_set = set()
+    for row in podaci:
+        # Прво проверавамо ново поље "Издавачи"
+        if row.get("Издавачи", "").strip():
+            for izdavac_item in row.get("Издавачи", "").split(";"):
+                izdavac_item = izdavac_item.strip()
+                if izdavac_item:
+                    izdavac_set.add(izdavac_item)
+        # Затим проверавамо и старо поље "Издавач"
+        elif row.get("Издавач", "").strip():
+            for izdavac_item in row.get("Издавач", "").split(";"):
+                izdavac_item = izdavac_item.strip()
+                if izdavac_item:
+                    izdavac_set.add(izdavac_item)
     izdavac = sorted(list(izdavac_set)) if izdavac_set else []
     
     povez_set = {row.get("Повез", "").strip() for row in podaci if row.get("Повез", "").strip() != ""}
@@ -88,8 +102,23 @@ def sacuvaj_podatke(putanja_do_csv, podaci):
         from backup_utils import napravi_backup
         napravi_backup(putanja_do_csv)
         # --- Крај backup блока ---
+        
+        # Пре чувања, проверавамо податке за компатибилност
+        for knjiga in podaci:
+            # Ако књига садржи поље "Издавачи", копирамо га у "Издавач" и уклањамо га
+            if "Издавачи" in knjiga:
+                knjiga["Издавач"] = knjiga["Издавачи"]
+                del knjiga["Издавачи"]
+        
         with open(putanja_do_csv, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['Редни број'] + [field for field in podaci[0].keys() if field != 'Редни број']
+            # Правимо листу поља за CSV
+            fieldnames = ['Редни број']
+            # Додајемо само поља која постоје у подацима
+            for knjiga in podaci:
+                for key in knjiga.keys():
+                    if key != 'Редни број' and key not in fieldnames:
+                        fieldnames.append(key)
+            
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(podaci)
@@ -117,12 +146,21 @@ def izmeni_knjigu(putanja_do_csv, naslov, nova_knjiga):
     """Измењује податке о књизи по наслову."""
     podaci = ucitaj_podatke(putanja_do_csv)
     izmenjeno = False
+    
+    # Обрада промена имена поља "Издавачи" -> "Издавач"
+    if "Издавачи" in nova_knjiga and "Издавач" not in nova_knjiga:
+        # Копирање вредности из поља "Издавачи" у поље "Издавач"
+        nova_knjiga["Издавач"] = nova_knjiga["Издавачи"]
+        # Уклањање поља "Издавачи" да не би изазвало грешку у CSV формату
+        del nova_knjiga["Издавачи"]
+    
     for i, knjiga in enumerate(podaci):
         if knjiga.get("Наслов", "").lower() == naslov.lower():
             for kljuc, vrednost in nova_knjiga.items():
                 knjiga[kljuc] = vrednost
             izmenjeno = True
             break
+    
     if izmenjeno:
         uspeh = sacuvaj_podatke(putanja_do_csv, podaci)
         if uspeh:

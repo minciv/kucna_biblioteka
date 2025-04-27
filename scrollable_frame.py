@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : scrollable_frame.py
-# @Version: 0.0.01.01
-# @Software: Windsurf
-# @Description: Датотека за управљање клизачима у 
+# @Аутор   : minciv
+# @Фајл     : scrollable_frame.py
+# @Верзија  : 0.0.01.02.
+# @Програм  : Windsurf
+# @Опис     : Датотека за управљање клизачима у корисничком интерфејсу
 
 import tkinter as tk
 from tkinter import ttk
@@ -14,6 +14,14 @@ class ScrollableFrame(ttk.Frame):
         canvas = tk.Canvas(self, height=height, borderwidth=0, highlightthickness=0)
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
         self.scrollable_frame = ttk.Frame(canvas)
+
+        # Експлицитна конфигурација за колоне и редове у унутрашњем фрејму
+        self.scrollable_frame.grid_columnconfigure(0, weight=0)  # Колона за дугмад
+        self.scrollable_frame.grid_columnconfigure(1, weight=1)  # Колона за унос
+        
+        # Постављање редова (довољно за типичан број елемената)
+        for i in range(15):
+            self.scrollable_frame.grid_rowconfigure(i, weight=0)
 
         self.scrollable_frame.bind(
             "<Configure>",

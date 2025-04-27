@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : kucna_biblioteka.py
-# @Version: 0.0.01.01.
-# @Software: Windsurf
-# @Description: Главна датотека за покретање програма Кућна Библиотека
+# @Аутор   : minciv
+# @Фајл     : kucna_biblioteka.py
+# @Верзија  : 0.0.01.02.
+# @Програм  : Windsurf
+# @Опис     : Главна датотека за покретање програма Кућна Библиотека
 
 import os
 from biblioteka_gui import main

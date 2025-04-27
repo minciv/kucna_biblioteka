@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : backup_utils.py
-# @Version: 0.0.01.01.
-# @Software: Windsurf
-# @Description: Датотека за управљање резервним копијама за Кућну Библиотеку
+# @Аутор   : minciv
+# @Фајл     : backup_utils.py
+# @Верзија  : 0.0.01.02.
+# @Програм  : Windsurf
+# @Опис     : Фајл за управљање резервним копијама за Кућну Библиотеку
 
 import os
 import shutil

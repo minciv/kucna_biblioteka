@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : biblioteka_gui.py
-# @Version: 0.0.01.01.
-# @Software: Windsurf
-# @Description: Датотека за покретање GUI за Кућну Библиотеку
+# @Аутор   : minciv
+# @Фајл     : biblioteka_gui.py
+# @Верзија  : 0.0.01.02.
+# @Програм  : Windsurf
+# @Опис     : Графички интерфејс за програм Кућна Библиотека
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -12,6 +12,7 @@ from scrollable_frame import ScrollableFrame
 import os
 import json
 from translations import TRANSLATIONS, ICONS
+from help_texts import HELP_TEXTS, ABOUT_TEXTS
 try:
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -81,7 +82,7 @@ class BibliotekaGUI:
         style.theme_use(self.settings.get('theme', DEFAULT_SETTINGS['theme']))
         self.setup_menu()
         self.setup_main_window()
-        self.root.minsize(400, 300)
+        self.root.minsize(550, 500)
         # self.root.maxsize(800, 600)  # Allow unlimited expansion
         # Keyboard shortcuts
         self.root.bind_all("<Control-n>", lambda e: self.otvori_dodavanje())
@@ -400,7 +401,7 @@ class BibliotekaGUI:
                         edit_frame = self.create_new_frame()
                         edit_frame.grid_columnconfigure(1, weight=1)
                         tk.Label(edit_frame, text=f"{self._get_label('edit_book_title')} {knjiga['Наслов']}", font=("Helvetica", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
-                        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал", "Колекција", "Издавач", "ИСБН", "Повез", "Напомена", "Позајмљена", "Враћена", "Ко је позајмио"]
+                        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал", "Колекција", "Издавачи", "ИСБН", "Повез", "Напомена", "Позајмљена", "Враћена", "Ко је позајмио"]
                         entries = {}
                         for i, field in enumerate(fields):
                             tk.Label(edit_frame, text=f"{field}:").grid(row=i+1, column=0, padx=5, pady=5)
@@ -474,13 +475,81 @@ class BibliotekaGUI:
                                 # Ово поље ће садржати све уносе аутора
                                 # Чувамо листу поља за ауторе
                                 entries["Писац"] = entries_authors
+                            elif field == "Издавачи":
+                                publisher_section = tk.LabelFrame(edit_frame, text=self._get_label('publishers'), padx=2, pady=2)
+                                publisher_section.grid(row=i+1, column=1, padx=5, pady=5, sticky="nsew", columnspan=2)
+                                edit_frame.grid_rowconfigure(i+1, weight=1)
+                                edit_frame.grid_columnconfigure(1, weight=1)
+                                publisher_section.grid_rowconfigure(0, weight=1)
+                                publisher_section.grid_columnconfigure(0, weight=1)
+
+                                scrollable_publishers = ScrollableFrame(publisher_section, height=120)
+                                scrollable_publishers.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+                                publishers_container = scrollable_publishers.get_frame()
+                                # Правилна конфигурација за приказ издавача један испод другог
+                                publishers_container.grid_columnconfigure(1, weight=1)
+                                # Поставља правилну конфигурацију за вертикални приказ
+                                for i in range(10):
+                                    publishers_container.grid_rowconfigure(i, weight=0)
+                                entries_publishers = []
+
+                                def add_publisher_field_edit(name=""):
+                                    row = len(entries_publishers)
+                                    btn_remove = ttk.Button(publishers_container, text="-", width=2, command=lambda r=row: remove_publisher_field(r))
+                                    btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
+                                    entry = ttk.Combobox(publishers_container, values=izdavac, width=25)
+                                    entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
+                                    entry.insert(0, name)
+                                    publishers_container.grid_rowconfigure(row, weight=0)
+                                    entries_publishers.append(entry)
+
+                                def remove_publisher_field(row):
+                                    if 0 <= row < len(entries_publishers):
+                                        entries_publishers[row].destroy()
+                                        entries_publishers.pop(row)
+                                        for i, entry in enumerate(entries_publishers):
+                                            btn = None
+                                            for widget in publishers_container.grid_slaves(row=i, column=0):
+                                                if isinstance(widget, ttk.Button):
+                                                    btn = widget
+                                                    break
+                                            if btn:
+                                                btn.grid(row=i, column=0, padx=2, pady=2, sticky="nw")
+                                            entry.grid(row=i, column=1, padx=2, pady=2, sticky="ew")
+                                    else:
+                                        print(f"[DEBUG] Покушај брисања невалидног издавача: {row}")
+
+                                # Узимамо издаваче директно из објекта књиге
+                                existing_publishers = []
+                                if "Издавачи" in knjiga and knjiga["Издавачи"]:
+                                    existing_publishers = knjiga["Издавачи"].split("; ")
+                                # Ако књига има старо поље "Издавач", користимо то
+                                elif "Издавач" in knjiga and knjiga["Издавач"]:
+                                    # Раздвајамо издаваче по тачка-зарезу, баш као што се ради и за поље "Издавачи"
+                                    existing_publishers = knjiga["Издавач"].split("; ")
+                                    
+                                for name in existing_publishers:
+                                    add_publisher_field_edit(name)
+                                if not existing_publishers:
+                                    add_publisher_field_edit()
+
+                                add_publisher_frame = tk.Frame(publisher_section)
+                                add_publisher_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
+                                add_publisher_frame.grid_columnconfigure(0, weight=1)
+                                new_publisher_entry = ttk.Combobox(add_publisher_frame, values=izdavac, width=25)
+                                new_publisher_entry.grid(row=0, column=0, padx=2, sticky="ew")
+
+                                def add_new_publisher_from_entry():
+                                    name = new_publisher_entry.get().strip()
+                                    if name:
+                                        add_publisher_field_edit(name)
+                                        new_publisher_entry.delete(0, tk.END)
+
+                                btn_add = ttk.Button(add_publisher_frame, text="+", width=2, command=add_new_publisher_from_entry)
+                                btn_add.grid(row=0, column=1, padx=2)
+                                entries[field] = entries_publishers
                             elif field == "Жанр":
                                 entry = ttk.Combobox(edit_frame, values=zanr, width=25)
-                                entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="ew")
-                                entry.set(knjiga.get(field, ""))
-                                entries[field] = entry
-                            elif field == "Издавач":
-                                entry = ttk.Combobox(edit_frame, values=izdavac, width=25)
                                 entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="ew")
                                 entry.set(knjiga.get(field, ""))
                                 entries[field] = entry
@@ -499,12 +568,14 @@ class BibliotekaGUI:
                             nova_knjiga = {}
                             for field in fields:
                                 if field == "Писац":
-                                    # Сви аутори се чувају одвојено, сваки у свом пољу
-                                    # Прикупи све ауторе из појединачних поља и споји их са тачка-запетом
                                     authors = [e.get() for e in entries_authors if e.get().strip()]
                                     nova_knjiga[field] = "; ".join(authors)
-                                elif field in ["Жанр", "Издавач"]:
-                                    val = entries[field].get() if hasattr(entries[field], 'get') else entries[field].get()
+                                elif field == "Издавачи":
+                                    publishers = [e.get() for e in entries_publishers if e.get().strip()]
+                                    # Чувамо у поље "Издавач" за компатибилност са CSV
+                                    nova_knjiga["Издавач"] = "; ".join(publishers)
+                                elif field in ["Жанр"]:
+                                    val = entries[field].get() if hasattr(entries[field], 'get') else str(entries[field])
                                     nova_knjiga[field] = val
                                 elif hasattr(entries[field], 'get'):
                                     nova_knjiga[field] = entries[field].get()
@@ -578,7 +649,7 @@ class BibliotekaGUI:
             print(f"[DEBUG] Грешка при учитавању података: {e}")
         
         # Креира поља за претрагу - искључујемо Повез из критеријума
-        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Издавач"]
+        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Издавачи"]
         entries = {}
         
         for i, field in enumerate(fields):
@@ -634,6 +705,15 @@ class BibliotekaGUI:
                     details += f"{kljuc}:\n"
                     for autor in autori:
                         details += f"  - {autor}\n"
+                else:
+                    details += f"{kljuc}: {vrednost}\n"
+            elif kljuc == "Издавачи":
+                izdavaci = vrednost.split(';')
+                izdavaci = [izdavac.strip() for izdavac in izdavaci if izdavac.strip()]
+                if len(izdavaci) > 1:
+                    details += f"{kljuc}:\n"
+                    for izdavac in izdavaci:
+                        details += f"  - {izdavac}\n"
                 else:
                     details += f"{kljuc}: {vrednost}\n"
             else:
@@ -741,6 +821,10 @@ class BibliotekaGUI:
         menubar.add_cascade(label=self._get_label('settings'), menu=settings_menu)
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label=self._get_label('menu_help'), command=self.show_help_window)
+        help_menu.add_separator()
+        help_menu.add_command(label=self._get_label('menu_license'), command=self.show_license)
+        help_menu.add_separator()
         help_menu.add_command(label=self._get_label('menu_about_desc'), command=self._show_about_desc)
         help_menu.add_command(label=self._get_label('menu_about_author'), command=self._show_about_author)
         help_menu.add_command(label=self._get_label('menu_about'), command=self._show_about_program)
@@ -751,13 +835,140 @@ class BibliotekaGUI:
         self.root.config(menu=menubar)
 
     def _show_about_desc(self):
-        messagebox.showinfo(self._get_label('menu_about_desc'), self._get_label('about_desc'))
+        """Display program description in the main frame"""
+        # Create a new frame for program description
+        frame = self.create_new_frame()
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Add a title at the top
+        tk.Label(frame, text=self._get_label('menu_about_desc'), font=("Helvetica", 14, "bold")).grid(row=0, column=0, pady=10)
+        
+        # Get the about text for current language
+        current_lang = self.settings.get('language', DEFAULT_SETTINGS['language'])
+        about_desc = ABOUT_TEXTS.get(current_lang, ABOUT_TEXTS['en'])['about_desc']
+        
+        # Display the description
+        text_widget = tk.Text(frame, wrap=tk.WORD, width=70, height=20, bg=frame.cget("bg"))
+        text_widget.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        text_widget.insert(tk.END, about_desc)
+        text_widget.config(state=tk.DISABLED)  # Make text read-only
+        
+        self.show_frame(frame)
 
     def _show_about_author(self):
-        messagebox.showinfo(self._get_label('menu_about_author'), self._get_label('about_author'))
+        """Display author information in the main frame"""
+        # Create a new frame for author information
+        frame = self.create_new_frame()
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Add a title at the top
+        tk.Label(frame, text=self._get_label('menu_about_author'), font=("Helvetica", 14, "bold")).grid(row=0, column=0, pady=10)
+        
+        # Get the about text for current language
+        current_lang = self.settings.get('language', DEFAULT_SETTINGS['language'])
+        about_author = ABOUT_TEXTS.get(current_lang, ABOUT_TEXTS['en'])['about_author']
+        
+        # Display the author information
+        text_widget = tk.Text(frame, wrap=tk.WORD, width=70, height=10, bg=frame.cget("bg"))
+        text_widget.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        text_widget.insert(tk.END, about_author)
+        text_widget.config(state=tk.DISABLED)  # Make text read-only
+        
+        self.show_frame(frame)
 
     def _show_about_program(self):
-        messagebox.showinfo(self._get_label('menu_about'), self._get_label('about_program'))
+        """Display program information in the main frame"""
+        # Create a new frame for program information
+        frame = self.create_new_frame()
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Add a title at the top
+        tk.Label(frame, text=self._get_label('menu_about'), font=("Helvetica", 14, "bold")).grid(row=0, column=0, pady=10)
+        
+        # Get the about text for current language
+        current_lang = self.settings.get('language', DEFAULT_SETTINGS['language'])
+        about_program = ABOUT_TEXTS.get(current_lang, ABOUT_TEXTS['en'])['about_program']
+        
+        # Display the program information
+        text_widget = tk.Text(frame, wrap=tk.WORD, width=70, height=15, bg=frame.cget("bg"))
+        text_widget.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        text_widget.insert(tk.END, about_program)
+        text_widget.config(state=tk.DISABLED)  # Make text read-only
+        
+        self.show_frame(frame)
+
+    def show_help_window(self):
+        """Displays the help content in the main frame"""
+        # Create a new frame for help content
+        frame = self.create_new_frame()
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Add a title at the top
+        tk.Label(frame, text=self._get_label('menu_help'), font=("Helvetica", 14, "bold")).grid(row=0, column=0, pady=10)
+        
+        # Create a scrollable frame for the help content
+        help_frame = ScrollableFrame(frame)
+        help_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        
+        # Get the help texts for current language
+        current_lang = self.settings.get('language', DEFAULT_SETTINGS['language'])
+        help_texts = HELP_TEXTS.get(current_lang, HELP_TEXTS['en'])  # Default to English if not found
+        
+        # Add help texts to the frame
+        for i, (text, description) in enumerate(help_texts):
+            # Add the text with proper formatting - use the text as-is without HTML parsing
+            label = tk.Label(help_frame.scrollable_frame, text=text, justify=tk.LEFT, wraplength=650, anchor="w")
+            label.grid(row=i*2, column=0, sticky="w", padx=5, pady=2)
+            
+            # Configure the label to render HTML-like formatting with different font
+            label.config(font=("Helvetica", 10))
+            
+            # If there's a description, add it with indentation
+            if description:
+                desc_label = tk.Label(help_frame.scrollable_frame, text=description, 
+                                    justify=tk.LEFT, wraplength=600, anchor="w")
+                desc_label.grid(row=i*2+1, column=0, sticky="w", padx=20, pady=2)
+                desc_label.config(font=("Helvetica", 9))
+        
+        self.show_frame(frame)
+        
+    def show_license(self):
+        """Приказ информација о лиценци у главном оквиру"""
+        # Креирање новог оквира за садржај лиценце
+        frame = self.create_new_frame()
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Додај наслов на врху
+        tk.Label(frame, text=self._get_label('menu_license'), font=("Helvetica", 14, "bold")).grid(row=0, column=0, pady=10)
+        
+        # Креирај оквир са скрол функцијом за садржај лиценце
+        license_frame = ScrollableFrame(frame)
+        license_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        
+        # Прочитај садржај фајла лиценце
+        license_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'LICENSE')
+        license_text = ""
+        if os.path.exists(license_path):
+            try:
+                with open(license_path, 'r', encoding='utf-8') as f:
+                    license_text = f.read()
+            except Exception as e:
+                license_text = f"Грешка при читању фајла лиценце: {e}"
+        else:
+            license_text = "Фајл лиценце није пронађен."
+        
+        # Прикажи садржај лиценце
+        text_widget = tk.Text(license_frame.scrollable_frame, wrap=tk.WORD, width=70, height=20, bg=frame.cget("bg"))
+        text_widget.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        text_widget.insert(tk.END, license_text)
+        text_widget.config(state=tk.DISABLED)  # Онемогући измену текста
+        
+        self.show_frame(frame)
 
     def otvori_settings(self):
         dialog = tk.Toplevel(self.root)
@@ -923,9 +1134,10 @@ class BibliotekaGUI:
     def otvori_dodavanje(self):
         frame = self.create_new_frame()
         fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал",
-              "Колекција", "Издавач", "ИСБН", "Повез", "Напомена"]
+          "Колекција", "Издавачи", "ИСБН", "Повез", "Напомена"]
         entries = {}
         entries_authors = []
+        entries_publishers = []
         
         for i, field in enumerate(fields):
             tk.Label(frame, text=f"{field}:").grid(row=i, column=0, padx=5, pady=5)
@@ -992,14 +1204,78 @@ class BibliotekaGUI:
                 btn_add.grid(row=0, column=1, padx=2)
                 entries["Писац"] = entries_authors
                 
+            elif field == "Издавачи":
+                # Креирамо посебну секцију за издаваче, слично ауторима
+                publisher_section = tk.LabelFrame(frame, text=self._get_label('publishers'), padx=2, pady=2)
+                publisher_section.grid(row=i, column=1, padx=5, pady=5, sticky="nsew")
+                frame.grid_rowconfigure(i, weight=1)
+                frame.grid_columnconfigure(1, weight=1)
+                publisher_section.grid_rowconfigure(0, weight=1)
+                publisher_section.grid_columnconfigure(0, weight=1)
+
+                # Use grid for the scrollable frame
+                scrollable_publishers = ScrollableFrame(publisher_section, height=120)
+                scrollable_publishers.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+                publishers_container = scrollable_publishers.get_frame()
+                # Правилна конфигурација за приказ издавача један испод другог
+                publishers_container.grid_columnconfigure(1, weight=1)
+                # Поставља правилну конфигурацију за вертикални приказ
+                for i in range(10):
+                    publishers_container.grid_rowconfigure(i, weight=0)
+                entries_publishers = []
+
+                def add_publisher_field(name=""):
+                    row = len(entries_publishers)
+                    btn_remove = ttk.Button(publishers_container, text="-", width=2, command=lambda r=row: remove_publisher_field(r))
+                    btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
+                    entry = ttk.Combobox(publishers_container, values=izdavac, width=25)
+                    entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
+                    entry.insert(0, name)
+                    publishers_container.grid_rowconfigure(row, weight=0)
+                    entries_publishers.append(entry)
+
+                def remove_publisher_field(row):
+                    if 0 <= row < len(entries_publishers):
+                        entries_publishers[row].destroy()
+                        entries_publishers.pop(row)
+                        for i, entry in enumerate(entries_publishers):
+                            btn = None
+                            for widget in publishers_container.grid_slaves(row=i, column=0):
+                                if isinstance(widget, ttk.Button):
+                                    btn = widget
+                                    break
+                            if btn:
+                                btn.grid(row=i, column=0, padx=2, pady=2, sticky="nw")
+                            entry.grid(row=i, column=1, padx=2, pady=2, sticky="ew")
+                    else:
+                        print(f"[DEBUG] Покушај брисања невалидног издавача: {row}")
+
+                # Додај поље за првог издавача
+                add_publisher_field()
+
+                # Додај контроле за додавање новог издавача
+                add_publisher_frame = tk.Frame(publisher_section)
+                add_publisher_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
+                add_publisher_frame.grid_columnconfigure(0, weight=1)
+                new_publisher_entry = ttk.Combobox(add_publisher_frame, values=izdavac, width=25)
+                new_publisher_entry.grid(row=0, column=0, padx=2, sticky="ew")
+                add_publisher_frame.grid_columnconfigure(0, weight=1)
+
+                def add_new_publisher_from_entry():
+                    name = new_publisher_entry.get().strip()
+                    if name:
+                        add_publisher_field(name)
+                        new_publisher_entry.delete(0, tk.END)
+
+                btn_add = ttk.Button(add_publisher_frame, text="+", width=2, command=add_new_publisher_from_entry)
+                btn_add.grid(row=0, column=1, padx=2)
+                entries[field] = entries_publishers
+                
             elif field == "Жанр":
-                entry = ttk.Combobox(frame, values=zanr, width=25)
-                entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
-                entries[field] = entry
-            elif field == "Издавач":
-                entry = ttk.Combobox(frame, values=izdavac, width=25)
-                entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
-                entries[field] = entry
+                # За претрагу користимо обичан Combobox
+                combo = ttk.Combobox(frame, values=zanr)
+                combo.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
+                entries[field] = combo
             elif field == "Повез":
                 entry = ttk.Combobox(frame, values=povez, width=25)
                 entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
@@ -1018,10 +1294,16 @@ class BibliotekaGUI:
                     # Прикупи све ауторе из појединачних поља и споји их са тачка-запетом
                     authors = [e.get() for e in entries_authors if e.get().strip()]
                     nova_knjiga[field] = "; ".join(authors)
-                elif field in ["Жанр", "Издавач", "Повез"]:
-                    widget = entries[field]
-                    value = widget.get() if hasattr(widget, 'get') else widget
-                    nova_knjiga[field] = value
+                elif field == "Издавачи":
+                    # Прикупи све издаваче из појединачних поља и споји их са тачка-запетом
+                    publishers = [e.get() for e in entries_publishers if e.get().strip()]
+                    # Чувамо у поље "Издавач" за компатибилност са CSV
+                    nova_knjiga["Издавач"] = "; ".join(publishers)
+                elif field in ["Жанр", "Повез"]:
+                    val = entries[field].get() if hasattr(entries[field], 'get') else entries[field].get()
+                    nova_knjiga[field] = val
+                elif hasattr(entries[field], 'get'):
+                    nova_knjiga[field] = entries[field].get()
                 else:
                     widget = entries[field]
                     value = widget.get() if hasattr(widget, 'get') else widget
