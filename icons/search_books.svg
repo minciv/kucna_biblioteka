@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Magnifying glass -->
+  <circle cx="10" cy="10" r="7" fill="none" stroke="#000" stroke-width="1.5" />
+  <line x1="15" y1="15" x2="20" y2="20" stroke="#000" stroke-width="2" stroke-linecap="round" />
+  <!-- Open book under magnifying glass -->
+  <path d="M6,10 C6,8 8,7 10,7 C12,7 14,8 14,10" fill="none" stroke="#8B4513" stroke-width="0.8" />
+  <line x1="10" y1="7" x2="10" y2="13" stroke="#8B4513" stroke-width="0.8" />
+</svg>

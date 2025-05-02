@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Аутор   : minciv
 # @Фајл     : biblioteka_gui.py
-# @Верзија  : 0.0.01.02.
+# @Верзија  : 0.1.01.01.
 # @Програм  : Windsurf
 # @Опис     : Графички интерфејс за програм Кућна Библиотека
 
@@ -13,17 +13,30 @@ import os
 import json
 from translations import TRANSLATIONS, ICONS
 from help_texts import HELP_TEXTS, ABOUT_TEXTS
+
+# Додајемо Pillow за рад са сликама
+try:
+    from PIL import Image, ImageTk
+    PIL_AVAILABLE = True
+except ImportError:
+    Image = None
+    ImageTk = None
+    PIL_AVAILABLE = False
+    
+# Увозимо менаџер икона
+try:
+    from icon_manager import initialize_icons, get_icon_manager
+    # Иницијализујемо менаџер икона
+    icon_manager = initialize_icons()
+    ICON_SUPPORT = True
+except ImportError:
+    ICON_SUPPORT = False
+    
 try:
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 except ImportError:
     Figure = None
-# Додајемо Pillow за рад са сликама
-try:
-    from PIL import Image, ImageTk
-except ImportError:
-    Image = None
-    ImageTk = None
 
 # Путања до фајла са подешавањима
 SETTINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
@@ -32,7 +45,8 @@ SETTINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settin
 DEFAULT_SETTINGS = {
     'theme': 'clam',
     'language': 'sr_CYRL',
-    'show_icons': True
+    'show_icons': True,
+    'use_png_icons': True
 }
 
 # Увозимо податке из модула Библиотека, или креирамо празне листе ако не постоје
@@ -80,6 +94,16 @@ class BibliotekaGUI:
         self.load_settings()
         style = ttk.Style()
         style.theme_use(self.settings.get('theme', DEFAULT_SETTINGS['theme']))
+        
+        # Иницијализација менаџера икона - проследи root објекат
+        if ICON_SUPPORT and PIL_AVAILABLE and self.settings.get('use_png_icons', True):
+            try:
+                icon_manager = get_icon_manager()
+                icon_manager.load_icons(self.root)
+                print("PNG иконе су успешно учитане")
+            except Exception as e:
+                print(f"Грешка при учитавању PNG икона: {e}")
+        
         self.setup_menu()
         self.setup_main_window()
         self.root.minsize(550, 500)
@@ -118,12 +142,15 @@ class BibliotekaGUI:
         # Buttons with tooltips and shortcut info
         shortcuts = {self.otvori_dodavanje: "Ctrl+N", self.otvori_pretragu: "Ctrl+F", self.go_back: "Esc"}
         for i, (key, command) in enumerate(commands):
-            label = self._get_label(key)
-            btn = ttk.Button(self.main_frame, text=label, command=command)
+            # Креирамо дугме са иконом
+            btn = self._create_button_with_icon(self.main_frame, key, command)
             btn.grid(row=i, column=0, pady=5, padx=10, sticky="ew")
             sc = shortcuts.get(command)
             if sc:
-                ToolTip(btn, f"{label} ({sc})")
+                # Узимамо само текст без иконе за tooltip
+                text_only = TRANSLATIONS.get(self.settings.get('language', DEFAULT_SETTINGS['language']), 
+                                          TRANSLATIONS[DEFAULT_SETTINGS['language']]).get(key, key)
+                ToolTip(btn, f"{text_only} ({sc})")
         
         # Покажи главни фрејм само једном
         self.show_frame(self.main_frame)
@@ -215,13 +242,14 @@ class BibliotekaGUI:
         # Проверава да ли дугме "Назад" већ постоји
         back_button_exists = False
         for child in frame.grid_slaves():
-            if isinstance(child, tk.Button) and child.cget("text") in [self._get_label('back')]:
+            if isinstance(child, (tk.Button, ttk.Button)) and child.cget("text") in [self._get_label('back')]:
                 back_button_exists = True
                 break
         # Ако дугме "Назад" не постоји, додаје ново
         if not back_button_exists:
-            back_btn = tk.Button(frame, text=self._get_label('back'), command=self.go_back)
-            back_btn.grid(row=last_row + 1, column=0, columnspan=2, pady=10, sticky="ew")
+            # Креирамо дугме са иконом
+            btn = self._create_button_with_icon(frame, 'back', self.go_back)
+            btn.grid(row=last_row + 1, column=0, columnspan=2, pady=10, sticky="ew")
 
     # Враћа се на претходни фрејм
     def go_back(self):
@@ -681,7 +709,9 @@ class BibliotekaGUI:
             rezultati = bib.pretraga(self.putanja, criteria)
             self.prikazi_rezultate(rezultati)
         
-        tk.Button(frame, text=self._get_label('search'), command=pretrazi).grid(row=len(fields)+1, column=0, columnspan=2, pady=10)
+        # Креирамо дугме за претрагу са иконом
+        search_btn = self._create_button_with_icon(frame, 'search_books', pretrazi)
+        search_btn.grid(row=len(fields)+1, column=0, columnspan=2, pady=10)
         self.show_frame(frame)
     
     # Приказује детаље о књизи
@@ -793,32 +823,84 @@ class BibliotekaGUI:
     def _get_label(self, key):
         lang = self.settings.get('language', DEFAULT_SETTINGS['language'])
         show_icons = self.settings.get('show_icons', True)
+        use_png_icons = self.settings.get('use_png_icons', True) and ICON_SUPPORT and PIL_AVAILABLE
+        
         text = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_SETTINGS['language']]).get(key, key)
-        if show_icons and key in ICONS:
+        
+        # Ако користимо PNG иконе, враћамо само текст који ће се приказати поред иконе
+        if use_png_icons:
+            return text
+        # Ако користимо емоџије као иконе
+        elif show_icons and key in ICONS:
             return f"{ICONS[key]} {text}"
         return text
+    
+    def _create_button_with_icon(self, parent, key, command, **kwargs):
+        """Креира дугме са иконом ако је доступна"""
+        use_png_icons = self.settings.get('use_png_icons', True) and ICON_SUPPORT and PIL_AVAILABLE
+        show_icons = self.settings.get('show_icons', True)
+        
+        text = self._get_label(key)
+        
+        btn = ttk.Button(parent, text=text, command=command, **kwargs)
+        
+        # Додајемо PNG икону ако је укључено
+        if use_png_icons and show_icons:
+            icon_manager = get_icon_manager()
+            # Проследи root прозор кроз родитељски виџет
+            root = parent.winfo_toplevel() if hasattr(parent, 'winfo_toplevel') else self.root
+            icon = icon_manager.get_icon(key, root)
+            if icon:
+                btn.config(image=icon, compound=tk.LEFT)
+                # Чувамо референцу на икону да не би била уклоњена од сакупљача отпада
+                btn.icon = icon
+        
+        return btn
 
     def setup_menu(self):
         menubar = tk.Menu(self.root)
+        
+        # Проверавамо да ли користимо PNG иконе
+        use_png_icons = self.settings.get('use_png_icons', True) and ICON_SUPPORT and PIL_AVAILABLE
+        
+        # Функција за додавање ставке у мени са иконом
+        def add_menu_item_with_icon(menu, key, command):
+            if use_png_icons:
+                # Добављамо икону
+                icon = get_icon_manager().get_icon(key, self.root)
+                if icon:
+                    menu.add_command(label=self._get_label(key), command=command, image=icon, compound=tk.LEFT)
+                    # Чувамо референцу на икону
+                    if not hasattr(menu, 'icons'):
+                        menu.icons = {}
+                    menu.icons[key] = icon
+                else:
+                    menu.add_command(label=self._get_label(key), command=command)
+            else:
+                menu.add_command(label=self._get_label(key), command=command)
+        
         # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label=self._get_label('export_json'), command=self.export_json)
-        file_menu.add_command(label=self._get_label('import_json'), command=self.import_json)
-        file_menu.add_command(label=self._get_label('export_excel'), command=self.export_excel)
-        file_menu.add_command(label=self._get_label('import_excel'), command=self.import_excel)
+        add_menu_item_with_icon(file_menu, 'export_json', self.export_json)
+        add_menu_item_with_icon(file_menu, 'import_json', self.import_json)
+        add_menu_item_with_icon(file_menu, 'export_excel', self.export_excel)
+        add_menu_item_with_icon(file_menu, 'import_excel', self.import_excel)
         file_menu.add_separator()
-        file_menu.add_command(label=self._get_label('exit'), command=self.root.destroy)
+        add_menu_item_with_icon(file_menu, 'exit', self.root.destroy)
         menubar.add_cascade(label=self._get_label('file'), menu=file_menu)
+        
         # View menu
         view_menu = tk.Menu(menubar, tearoff=0)
-        view_menu.add_command(label=self._get_label('all_books'), command=self.prikazi_knjige)
-        view_menu.add_command(label=self._get_label('all_authors'), command=self.prikazi_sve_pisce)
-        view_menu.add_command(label=self._get_label('statistics'), command=self.otvori_statistiku)
+        add_menu_item_with_icon(view_menu, 'all_books', self.prikazi_knjige)
+        add_menu_item_with_icon(view_menu, 'all_authors', self.prikazi_sve_pisce)
+        add_menu_item_with_icon(view_menu, 'statistics', self.otvori_statistiku)
         menubar.add_cascade(label=self._get_label('view'), menu=view_menu)
+        
         # Settings menu
         settings_menu = tk.Menu(menubar, tearoff=0)
-        settings_menu.add_command(label=self._get_label('settings'), command=self.otvori_settings)
+        add_menu_item_with_icon(settings_menu, 'settings', self.otvori_settings)
         menubar.add_cascade(label=self._get_label('settings'), menu=settings_menu)
+        
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label=self._get_label('menu_help'), command=self.show_help_window)
@@ -829,9 +911,23 @@ class BibliotekaGUI:
         help_menu.add_command(label=self._get_label('menu_about_author'), command=self._show_about_author)
         help_menu.add_command(label=self._get_label('menu_about'), command=self._show_about_program)
         menubar.add_cascade(label=self._get_label('menu_help'), menu=help_menu)
+        
         # Back menu
         if hasattr(self, 'current_frame') and self.current_frame is not None and self.current_frame != self.main_frame:
-            menubar.add_command(label=self._get_label('back_to_main'), command=self.setup_main_window)
+            if use_png_icons:
+                icon = get_icon_manager().get_icon('back_to_main', self.root)
+                if icon:
+                    menubar.add_command(label=self._get_label('back_to_main'), command=self.setup_main_window, 
+                                       image=icon, compound=tk.LEFT)
+                    # Чувамо референцу на икону
+                    if not hasattr(menubar, 'icons'):
+                        menubar.icons = {}
+                    menubar.icons['back_to_main'] = icon
+                else:
+                    menubar.add_command(label=self._get_label('back_to_main'), command=self.setup_main_window)
+            else:
+                menubar.add_command(label=self._get_label('back_to_main'), command=self.setup_main_window)
+        
         self.root.config(menu=menubar)
 
     def _show_about_desc(self):
@@ -1376,7 +1472,9 @@ class BibliotekaGUI:
                     self.go_back()
                 else:
                     messagebox.showerror("Грешка", "Књига није пронађена или је дошло до грешке при брисању.")
-        tk.Button(frame, text=self._get_label('delete'), command=obrisi).grid(row=2, column=0, pady=5)
+        # Креирамо дугме за брисање са иконом
+        delete_btn = self._create_button_with_icon(frame, 'delete_book', obrisi)
+        delete_btn.grid(row=2, column=0, pady=5)
         self.show_frame(frame)
     
     def import_excel(self):

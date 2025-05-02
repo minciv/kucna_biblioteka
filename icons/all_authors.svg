@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Scholar figure similar to the image -->
+  <circle cx="8" cy="7" r="3" fill="#333" />
+  <path d="M5,10 C4,12 4,14 5,16 L8,20 L11,16 C12,14 12,12 11,10 C10,11 9,11 8,11 C7,11 6,11 5,10 Z" fill="#333" />
+  <!-- Second scholar figure -->
+  <circle cx="16" cy="7" r="3" fill="#555" />
+  <path d="M13,10 C12,12 12,14 13,16 L16,20 L19,16 C20,14 20,12 19,10 C18,11 17,11 16,11 C15,11 14,11 13,10 Z" fill="#555" />
+  <!-- Quill pen -->
+  <path d="M10,14 L12,12 C12,12 13,11 14,12 C15,13 14,14 14,14 L12,16 L10,16.5 L9.5,15 Z" fill="#F5F5DC" stroke="#000" stroke-width="0.3" />
+</svg>
