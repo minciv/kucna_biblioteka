@@ -1,10 +1,27 @@
-#!/usr/bin/env xdg-open
+# -*- coding: utf-8 -*-
+# @Аутор    : minciv
+# @Фајл     : Biblioteka.desktop
+# @Верзија  : 0.2.0
+# @Програм  : Windsurf
+# @Опис     : Десктоп фајл за покретање Кућне Библиотеке
+
 [Desktop Entry]
-Version=1.0
-Type=Application
-Name=Кућна Библиотека
-Comment=Покретање Python апликације за управљање библиотеком
-Exec=python3 /home/minciv/Документа/Učenje/Python/Biblioteka/kucna_biblioteka.py
-Icon=/home/minciv/Документа/Učenje/Python/Biblioteka/ikona_biblioteka_64.png
-Terminal=false
 Categories=Education;Office;
+Comment[sr_RS]=Покретање Python апликације за управљање библиотеком
+Comment=Покретање Python апликације за управљање библиотеком
+Exec=python3 %k/kucna_biblioteka.py
+GenericName[sr_RS]=Програм за управљање кућном библиотеком
+GenericName=Home Library Management Program
+Icon=%k/ikona_kucna_biblioteka.png
+MimeType=
+Name[sr_RS]=Кућна Библиотека
+Name=Кућна Библиотека
+Path=%k
+StartupNotify=true
+StartupWMClass=kucna_biblioteka
+Terminal=false
+TerminalOptions=
+Type=Application
+Version=0.2.0
+X-KDE-SubstituteUID=false
+X-KDE-Username=

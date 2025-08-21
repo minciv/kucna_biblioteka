@@ -1,34 +1,85 @@
 # -*- coding: utf-8 -*-
-# @Аутор   : minciv
+# @Аутор    : minciv
 # @Фајл     : Biblioteka.py
-# @Верзија  : 0.1.01.01.
+# @Верзија  : 0.2.0
 # @Програм  : Windsurf
 # @Опис     : Датотека за управљање подацима о књигама
 
 import os
 import csv
+from typing import List, Dict, Optional
+from logger import get_logger
+from config import CSV_COLUMNS, DEFAULT_DB_PATH
+
+logger = get_logger(__name__)
 
 # Иницијализација глобалних променљивих
-zanr = []
-izdavac = []
-povez = []
-pisci = []
+zanr: List[str] = []
+izdavac: List[str] = []
+povez: List[str] = []
+pisci: List[str] = []
 
-def ucitaj_podatke(putanja_do_csv):
-    """Учитава податке из CSV фајла."""
+def ucitaj_podatke(putanja_do_csv: str = DEFAULT_DB_PATH) -> List[Dict[str, str]]:
+    """Učitava podatke iz CSV fajla sa poboljšanim rukovanjem greškama."""
+    if not os.path.exists(putanja_do_csv):
+        logger.error(f"Fajl nije pronađen: {putanja_do_csv}")
+        return []
+        
     try:
         with open(putanja_do_csv, 'r', encoding='utf-8') as csvfile:
+            # Prvo pročitaj zaglavlje da proverimo kolone
+            first_line = csvfile.readline().strip()
+            csvfile.seek(0)  # Vrati se na početak fajla
+            
+            # Proveri da li je fajl prazan
+            if not first_line:
+                logger.error(f"CSV fajl je prazan: {putanja_do_csv}")
+                return []
+                
             reader = csv.DictReader(csvfile)
-            data = list(reader)
+            
+            # Proveri da li postoje sva zaglavlja
+            if not reader.fieldnames:
+                logger.error(f"CSV fajl nema zaglavlja: {putanja_do_csv}")
+                return []
+                
+            # Proveri da li postoje sve obavezne kolone
+            missing_columns = [col for col in CSV_COLUMNS if col not in reader.fieldnames]
+            if missing_columns:
+                logger.error(f"Nedostaju obavezne kolone u CSV fajlu: {putanja_do_csv}")
+                logger.error(f"Nedostajuće kolone: {', '.join(missing_columns)}")
+                return []
+                
+            # Učitaj podatke i proveri validnost
+            data = []
+            for i, row in enumerate(reader, start=2):  # Start=2 jer je prva linija zaglavlje
+                # Proveri da li red ima sve potrebne kolone
+                if all(col in row for col in CSV_COLUMNS):
+                    data.append(row)
+                else:
+                    logger.warning(f"Red {i} nema sve potrebne kolone i biće preskočen")
+            
+            logger.info(f"Uspešno učitano {len(data)} zapisa iz {putanja_do_csv}")
             return data
-    except FileNotFoundError:
-        print(f"Грешка: Фајл није пронађен: {putanja_do_csv}")
+            
+    except UnicodeDecodeError:
+        logger.error(f"Problem sa kodiranjem fajla. Pokušaj sa drugim encoding-om: {putanja_do_csv}")
+        # Pokušaj sa drugim encoding-om
+        try:
+            with open(putanja_do_csv, 'r', encoding='cp1252') as csvfile:
+                reader = csv.DictReader(csvfile)
+                return list(reader)
+        except Exception:
+            logger.exception(f"Nije moguće pročitati fajl ni sa alternativnim encoding-om")
+            return []
+    except csv.Error as e:
+        logger.error(f"CSV greška: {e}")
         return []
     except Exception as e:
-        print(f"Грешка приликом читања фајла: {e}")
+        logger.exception(f"Neočekivana greška pri čitanju fajla: {e}")
         return []
 
-def dobavi_sve_pisce(podaci):
+def dobavi_sve_pisce(podaci: List[Dict[str, str]]) -> List[str]:
     """Извлачи све писце из базе података и враћа их као регистар."""
     pisci_set = set()
     
@@ -45,57 +96,42 @@ def dobavi_sve_pisce(podaci):
     # Претвара сет у сортирану листу
     return sorted(list(pisci_set))
 
-def podeli_pisce(pisci_text):
+def podeli_pisce(pisci_text: str) -> List[str]:
     """Дели текст писаца раздвојен са ';' у листу писаца."""
     if not pisci_text:
         return []
     return [p.strip() for p in pisci_text.split(';') if p.strip()]
 
-def inicijalizuj_podatke(putanja_do_csv=None):
+def inicijalizuj_podatke(putanja_do_csv: Optional[str] = None) -> Dict[str, List[str]]:
     """Иницијализује глобалне променљиве на основу података из CSV фајла."""
     global zanr, izdavac, povez, pisci
-    
-    # Ако није задата путања, покушај да нађеш CSV у истом директоријуму
-    if putanja_do_csv is None:
-        putanja_do_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Biblioteka.csv')
-    
+
+    # Подразумевана путања до CSV фајла
+    putanja_do_csv = putanja_do_csv or DEFAULT_DB_PATH
+
     podaci = ucitaj_podatke(putanja_do_csv)
-    
-    # Извлачи јединствене вредности из колона
-    zanr_set = {row.get("Жанр", "").strip() for row in podaci if row.get("Жанр", "").strip() != ""}
-    zanr = sorted(list(zanr_set)) if zanr_set else []
-    
-    # Извлачи издаваче (слично као за писце, подржава вишеструке издаваче)
+
+    # Помоћна функција за издвајање јединствених вредности из колоне
+    def izdvoji_jedinstvene_vrednosti(kolona: str) -> List[str]:
+        return sorted({row.get(kolona, "").strip() for row in podaci if row.get(kolona, "").strip()})
+
+    zanr = izdvoji_jedinstvene_vrednosti("Жанр")
+    povez = izdvoji_jedinstvene_vrednosti("Повез")
+
+    # Обрада издавача
     izdavac_set = set()
     for row in podaci:
-        # Прво проверавамо ново поље "Издавачи"
-        if row.get("Издавачи", "").strip():
-            for izdavac_item in row.get("Издавачи", "").split(";"):
-                izdavac_item = izdavac_item.strip()
-                if izdavac_item:
-                    izdavac_set.add(izdavac_item)
-        # Затим проверавамо и старо поље "Издавач"
-        elif row.get("Издавач", "").strip():
-            for izdavac_item in row.get("Издавач", "").split(";"):
-                izdavac_item = izdavac_item.strip()
-                if izdavac_item:
-                    izdavac_set.add(izdavac_item)
-    izdavac = sorted(list(izdavac_set)) if izdavac_set else []
-    
-    povez_set = {row.get("Повез", "").strip() for row in podaci if row.get("Повез", "").strip() != ""}
-    povez = sorted(list(povez_set)) if povez_set else []
-    
-    # Креира регистар писаца
-    pisci = dobavi_sve_pisce(podaci)
-    
-    return {
-        'zanr': zanr,
-        'izdavac': izdavac,
-        'povez': povez,
-        'pisci': pisci
-    }
+        for kolona in ["Издавачи", "Издавач"]:
+            if row.get(kolona, "").strip():
+                izdavac_set.update(map(str.strip, row[kolona].split(";")))
+    izdavac = sorted(izdavac_set)
 
-def sacuvaj_podatke(putanja_do_csv, podaci):
+    # Креирање регистра писаца
+    pisci = dobavi_sve_pisce(podaci)
+
+    return {'zanr': zanr, 'izdavac': izdavac, 'povez': povez, 'pisci': pisci}
+
+def sacuvaj_podatke(putanja_do_csv: str, podaci: List[Dict[str, str]]) -> bool:
     """Сачувава податке у CSV фајл. Пре сваког чувања прави резервну копију (backup)."""
     try:
         # --- Резервна копија пре сваке измене ---
@@ -124,17 +160,17 @@ def sacuvaj_podatke(putanja_do_csv, podaci):
             writer.writerows(podaci)
         return True
     except Exception as e:
-        print(f"Грешка приликом писања у фајл: {e}")
+        logger.exception(f"Greška pri pisanju u fajl: {e}")
         return False
 
-def dodaj_knjigu(putanja_do_csv, nova_knjiga):
+def dodaj_knjigu(putanja_do_csv: str, nova_knjiga: Dict[str, str]) -> bool:
     """Додаје нову књигу у библиотеку."""
     podaci = ucitaj_podatke(putanja_do_csv)
     nova_knjiga["Редни број"] = str(len(podaci) + 1)
     podaci.append(nova_knjiga)
     return sacuvaj_podatke(putanja_do_csv, podaci)
 
-def obrisi_knjigu(putanja_do_csv, naslov):
+def obrisi_knjigu(putanja_do_csv: str, naslov: str) -> bool:
     """Уклања књигу из библиотеке по наслову."""
     podaci = ucitaj_podatke(putanja_do_csv)
     nova_lista = [k for k in podaci if k.get("Наслов", "").lower() != naslov.lower()]
@@ -142,7 +178,7 @@ def obrisi_knjigu(putanja_do_csv, naslov):
         return False
     return sacuvaj_podatke(putanja_do_csv, nova_lista)
 
-def izmeni_knjigu(putanja_do_csv, naslov, nova_knjiga):
+def izmeni_knjigu(putanja_do_csv: str, naslov: str, nova_knjiga: Dict[str, str]) -> bool:
     """Измењује податке о књизи по наслову."""
     podaci = ucitaj_podatke(putanja_do_csv)
     izmenjeno = False
@@ -169,13 +205,13 @@ def izmeni_knjigu(putanja_do_csv, naslov, nova_knjiga):
         return uspeh
     return False
 
-def azuriraj_registar_pisaca(podaci):
+def azuriraj_registar_pisaca(podaci: List[Dict[str, str]]) -> List[str]:
     """Ажурира глобални регистар писаца након промена у подацима."""
     global pisci
     pisci = dobavi_sve_pisce(podaci)
     return pisci
 
-def pretraga(putanja_do_csv, kriterijumi):
+def pretraga(putanja_do_csv: str, kriterijumi: Dict[str, str]) -> List[Dict[str, str]]:
     """Претражује податке на основу критеријума."""
     podaci = ucitaj_podatke(putanja_do_csv)
     rezultat = []
@@ -189,13 +225,70 @@ def pretraga(putanja_do_csv, kriterijumi):
             rezultat.append(knjiga)
     return rezultat
 
-def pretraga_pozajmica(putanja_do_csv, naslov):
+def pretraga_pozajmica(putanja_do_csv: str, naslov: str) -> Optional[Dict[str, str]]:
     """Претражује књиге по наслову да би нашао податке о позајмици."""
     podaci = ucitaj_podatke(putanja_do_csv)
     for knjiga in podaci:
         if knjiga.get("Наслов", "").lower() == naslov.lower():
-            return {k: knjiga.get(k, "Не постоји податак") for k in ["Позајмљена", "Враћена", "Ко је позајмио"]}
+            return {k: knjiga.get(k, "Не постоји податак") for k in ["Позајмљена", "Враћена", "Ко је позајмио", "Датум позајмице", "Датум враћања", "Напомена о позајмици"]}
     return None
+
+def pozajmi_knjigu(putanja_do_csv: str, naslov: str, ko_pozajmljuje: str, datum_pozajmice=None, datum_vracanja=None, napomena=None) -> bool:
+    """Позајмљује књигу по наслову."""
+    podaci = ucitaj_podatke(putanja_do_csv)
+    for i, knjiga in enumerate(podaci):
+        if knjiga.get("Наслов", "").lower() == naslov.lower():
+            # Провери да ли је књига већ позајмљена
+            if knjiga.get("Позајмљена", "") == "Да" and knjiga.get("Враћена", "") != "Да":
+                logger.error(f"Knjiga '{naslov}' je već pozajmljena.")
+                return False
+                
+            # Постави податке о позајмици
+            podaci[i]["Позајмљена"] = "Да"
+            podaci[i]["Враћена"] = ""
+            podaci[i]["Ко је позајмио"] = ko_pozajmljuje
+            
+            # Додатни подаци
+            if datum_pozajmice:
+                podaci[i]["Датум позајмице"] = datum_pozajmice.strftime("%Y-%m-%d")
+            else:
+                from datetime import date
+                podaci[i]["Датум позајмице"] = date.today().strftime("%Y-%m-%d")
+                
+            if datum_vracanja:
+                podaci[i]["Датум враћања"] = datum_vracanja.strftime("%Y-%m-%d")
+            else:
+                podaci[i]["Датум враћања"] = ""
+                
+            if napomena:
+                podaci[i]["Напомена о позајмици"] = napomena
+            
+            return sacuvaj_podatke(putanja_do_csv, podaci)
+    
+    logger.error(f"Knjiga '{naslov}' nije pronađena.")
+    return False
+
+def vrati_knjigu(putanja_do_csv: str, naslov: str) -> bool:
+    """Враћа позајмљену књигу по наслову."""
+    podaci = ucitaj_podatke(putanja_do_csv)
+    for i, knjiga in enumerate(podaci):
+        if knjiga.get("Наслов", "").lower() == naslov.lower():
+            # Провери да ли је књига позајмљена
+            if knjiga.get("Позајмљена", "") != "Да" or knjiga.get("Враћена", "") == "Да":
+                logger.error(f"Knjiga '{naslov}' nije pozajmljena.")
+                return False
+                
+            # Постави податке о враћању
+            podaci[i]["Враћена"] = "Да"
+            
+            # Додај датум враћања
+            from datetime import date
+            podaci[i]["Датум враћања"] = date.today().strftime("%Y-%m-%d")
+            
+            return sacuvaj_podatke(putanja_do_csv, podaci)
+    
+    logger.error(f"Knjiga '{naslov}' nije pronađena.")
+    return False
 
 # Иницијализуј глобалне променљиве модула одмах
 inicijalizuj_podatke()
@@ -203,6 +296,7 @@ inicijalizuj_podatke()
 if __name__ == "__main__":
     putanja_do_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Biblioteka.csv')
     print("Модул за рад са библиотеком је успешно учитан.")
+    inicijalizuj_podatke()
     print(f"Број жанрова: {len(zanr)}")
     print(f"Број издавача: {len(izdavac)}")
     print(f"Број типова повеза: {len(povez)}")

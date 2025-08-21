@@ -1,20 +1,22 @@
 # -*- coding: utf-8 -*-
-# @Author  : minciv
-# @File    : LICENSE
-# @Software: Windsurf
+# @Аутор    : minciv
+# @Фајл     : LICENSE
+# @Верзија  : 0.2.0
+# @Програм  : Windsurf
+# @Опис     : Лиценца за Кућну Библиотеку
 
 Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
 
 Copyright (c) 2025 minciv
 
-You are free to:
-- Share — copy and redistribute the material in any medium or format
-- Adapt — remix, transform, and build upon the material
+Слободни сте да:
+- Делите — копирате и редистрибуирате материјал у било ком медијуму или формату
+- Прилагођавате — прерађујете, трансформишете и надограђујете материјал
 
-Under the following terms:
-- **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made.
-- **NonCommercial** — You may not use the material for commercial purposes.
+Под следећим условима:
+- **Атрибуција** — Морате дати одговарајуће признање, обезбедити везу ка лиценци и назначити ако су направљене промене.
+- **Некомерцијално** — Не можете користити материјал у комерцијалне сврхе.
 
-No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+Без додатних ограничења — Не можете примењивати правне услове или технолошке мере које законски ограничавају друге да раде било шта што лиценца дозвољава.
 
-Full license text: https://creativecommons.org/licenses/by-nc/4.0/
+Пуни текст лиценце: https://creativecommons.org/licenses/by-nc/4.0/

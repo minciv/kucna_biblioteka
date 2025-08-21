@@ -1,0 +1,79 @@
+# -*- coding: utf-8 -*-
+# @Аутор    : minciv
+# @Фајл     : pyproject.toml
+# @Верзија  : 0.2.0
+# @Програм  : Windsurf
+# @Опис     : Модернизовани фајл са захтевима за Кућну Библиотеку
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kucna-biblioteka"
+version = "0.2.0"
+description = "Модернизована Python GUI апликација за вођење евиденције о књигама, ауторима, серијалима, издавачима и позајмицама у кућној библиотеци."
+readme = "README.md"
+license = {text = "CC-BY-NC-4.0"}
+authors = [
+    {name = "minciv", email = "minciv@protonmail.com"}
+]
+keywords = ["library", "books", "management", "gui", "serbian"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: Free for non-commercial use",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business",
+    "Topic :: Database :: Front-Ends",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.9.0",
+    "openpyxl>=3.1.5",
+    "pandas>=2.2.0",
+    "pillow>=11.0.0",
+    "pydantic>=2.5.0",
+    "python-dateutil>=2.8.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "mypy>=1.8.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+kucna-biblioteka = "kucna_biblioteka:init_app"
+
+[project.urls]
+Homepage = "https://github.com/minciv/kucna-biblioteka"
+Repository = "https://github.com/minciv/kucna-biblioteka"
+Issues = "https://github.com/minciv/kucna-biblioteka/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*", "docs*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"

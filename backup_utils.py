@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Аутор   : minciv
 # @Фајл     : backup_utils.py
-# @Верзија  : 0.1.01.01.
+# @Верзија  : 0.2.0
 # @Програм  : Windsurf
 # @Опис     : Фајл за управљање резервним копијама за Кућну Библиотеку
 
@@ -29,10 +29,10 @@ def ocisti_stare_backup_fajlove(putanja_do_csv, max_backups=MAX_BACKUPS):
     backup_fajlovi.sort(key=os.path.getmtime)
     
     # Број фајлова које треба обрисати
-    број_за_брисање = max(0, len(backup_fajlovi) - max_backups)
+    broj_za_brisanje = max(0, len(backup_fajlovi) - max_backups)
     
     # Бришемо најстарије фајлове
-    for i in range(број_за_брисање):
+    for i in range(broj_za_brisanje):
         try:
             os.remove(backup_fajlovi[i])
             print(f"[INFO] Обрисан стари бацкуп: {backup_fajlovi[i]}")

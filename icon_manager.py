@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# @Аутор   : minciv
-# @Фајл     : icon_manager.py
-# @Верзија  : 0.0.01.00.
-# @Програм  : Windsurf
-# @Опис     : Менаџер икона за програм Кућна Библиотека
+# -*- coding : utf-8 -*-
+# @Аутор     : minciv
+# @Фајл      : icon_manager.py
+# @Верзија   : 0.2.0
+# @Програм   : Windsurf
+# @Опис      : Менаџер икона за програм Кућна Библиотека
 
+# Увозимо потребне модуле
 import os
 import tkinter as tk
 from PIL import Image, ImageTk
 
+# Класа за управљање иконама
 class IconManager:
     """Класа која управља иконама апликације"""
     
@@ -25,6 +27,7 @@ class IconManager:
         self.icon_size = (16, 16)  # Подразумевана величина иконе
         self.icons_loaded = False  # Пратимо да ли су иконе учитане
     
+    # Метод за учитавање иконица
     def load_icons(self, root=None):
         """Учитава иконе из директоријума. Потребан је root објекат Tkinter-а"""
         # Већ учитано?
@@ -60,6 +63,7 @@ class IconManager:
         self.icons_loaded = True
         return self.icons
     
+    # Метод за враћање иконе по кључу
     def get_icon(self, key, root=None):
         """Враћа икону за дати кључ или None ако не постоји"""
         # Ако иконе нису учитане, учитај их сада
@@ -67,6 +71,7 @@ class IconManager:
             self.load_icons(root)
         return self.icons.get(key)
     
+    # Метод за враћање свих иконица
     def get_all_icons(self, root=None):
         """Враћа све иконе"""
         # Ако иконе нису учитане, учитај их сада
@@ -74,6 +79,7 @@ class IconManager:
             self.load_icons(root)
         return self.icons
     
+    # Метод за постављање величине иконица
     def set_icon_size(self, width, height, root=None):
         """Поставља величину икона и поново учитава иконе"""
         self.icon_size = (width, height)
@@ -84,15 +90,17 @@ class IconManager:
 # Глобална инстанца менаџера икона
 ICON_MANAGER = None
 
+# Функција за иницијализацију менаџера икона
 def initialize_icons(icons_dir=None):
-    """Initialize the global icon manager instance"""
+    """Иницијализира глобалну инстанцу менаџера икона"""
     global ICON_MANAGER
     if ICON_MANAGER is None:
-        # If icons_dir is None, the IconManager will use the default path
+        # Ако icons_dir је None, IconManager će користити подразумевану путању
         ICON_MANAGER = IconManager(icons_dir)
         print(f"Icon Manager initialized with path: {ICON_MANAGER.icons_dir}")
     return ICON_MANAGER
 
+# Функција за враћање глобалне инстанце менаџера икона
 def get_icon_manager():
     """Враћа глобалну инстанцу менаџера икона"""
     global ICON_MANAGER

@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-# @Аутор   : minciv
+# @Аутор    : minciv
 # @Фајл     : scrollable_frame.py
-# @Верзија  : 0.1.01.01.
+# @Верзија  : 0.2.0
 # @Програм  : Windsurf
 # @Опис     : Датотека за управљање клизачима у корисничком интерфејсу
 
+# Увозимо потребне модуле
 import tkinter as tk
 from tkinter import ttk
 
+# Класа за клизач
 class ScrollableFrame(ttk.Frame):
     def __init__(self, container, height=100, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
@@ -36,5 +38,6 @@ class ScrollableFrame(ttk.Frame):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+    # Функција за враћање унутрашњег фрејма
     def get_frame(self):
         return self.scrollable_frame

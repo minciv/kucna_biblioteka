@@ -1,4 +1,12 @@
+# -*- coding: utf-8 -*-
+# @Аутор    : minciv
+# @Фајл     : utils.py
+# @Верзија  : 0.2.0
+# @Програм  : Windsurf
+# @Опис     : Помоћне функције за Кућну Библиотеку
+
 import csv
+from typing import Dict
 
 # Функција за учитавање података из CSV фајла
 def ucitaj_podatke(put_do_bibcsv):
@@ -33,3 +41,15 @@ def pretraga_pozajmica(biblioteka_podaci, naslov):
                 "Ко је позајмио": knjiga.get("Ко је позајмио", "Нема података")
             }
     return None
+
+def validiraj_knjigu(knjiga: Dict[str, str]) -> bool:
+    """Validira podatke o knjizi pre čuvanja."""
+    obavezna_polja = ["Наслов", "Писац"]
+    for polje in obavezna_polja:
+        if not knjiga.get(polje):
+            print(f"Грешка: Поље '{polje}' је обавезно.")
+            return False
+    if knjiga.get("Година издавања") and not knjiga["Година издавања"].isdigit():
+        print("Грешка: Година издавања мора бити број.")
+        return False
+    return True

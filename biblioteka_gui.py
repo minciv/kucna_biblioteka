@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-# @Аутор   : minciv
+# @Аутор    : minciv
 # @Фајл     : biblioteka_gui.py
-# @Верзија  : 0.1.01.01.
+# @Верзија  : 0.2.0
 # @Програм  : Windsurf
 # @Опис     : Графички интерфејс за програм Кућна Библиотека
 
+# Увозимо потребне модуле
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import Biblioteka as bib
@@ -61,7 +62,7 @@ except ImportError:
 
 # Увоз статистике
 from statistika import (
-    ukupno_knjiga, ukupno_auta, broj_zanrova, broj_serijala, broj_pozajmica,
+    ukupno_knjiga, ukupno_autora, broj_zanrova, broj_serijala, broj_pozajmica,
     knjige_po_zanru, knjige_po_izdavacu, top_autori
 )
 
@@ -69,63 +70,164 @@ from statistika import (
 class BibliotekaGUI:
     def __init__(self, root, putanja):
         self.root = root
+        self.putanja = putanja  # Сачувај путању као атрибут
+        self.frame_stack = []  # Иницијализација стека фрејмова
         self.root.title("Кућна Библиотека")
         # Постављање иконице апликације ако постоји
         try:
             if Image and ImageTk:
-                ikona_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ikona_biblioteka_64.png')
+                ikona_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ikona_kucna_biblioteka_64.png')
                 if os.path.exists(ikona_path):
                     ikona_img = Image.open(ikona_path)
                     self._icon_img = ImageTk.PhotoImage(ikona_img)
                     self.root.iconphoto(True, self._icon_img)
         except Exception as e:
             pass  # Ако нешто не ради, настави без иконице
-        self.putanja = putanja
-        self.frame_stack = []
         self.current_frame = None
-        # Креира главни контејнер
-        self.container = tk.Frame(self.root)
-        self.container.grid(row=0, column=0, sticky="nsew")
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        self.container.grid_rowconfigure(0, weight=1)
-        self.container.grid_columnconfigure(0, weight=1)
-        self.container.grid_columnconfigure(1, weight=1)
-        self.load_settings()
-        style = ttk.Style()
-        style.theme_use(self.settings.get('theme', DEFAULT_SETTINGS['theme']))
+        self.history = []  # Stack for navigation history
+        self.language = "sr_CYRL"  # Default language
+        self.status_bar = None
+        self.progress_var = tk.DoubleVar()
         
-        # Иницијализација менаџера икона - проследи root објекат
-        if ICON_SUPPORT and PIL_AVAILABLE and self.settings.get('use_png_icons', True):
+        # Постављање наслова и иконе
+        self.root.title("Кућна библиотека")
+        try:
+            self.root.iconphoto(True, tk.PhotoImage(file="ikona_kucna_biblioteka.png"))
+        except Exception as e:
+            print(f"Грешка при учитавању иконе: {e}")
+        
+        # Главни контејнер
+        self.container = tk.Frame(self.root)
+        self.container.pack(fill="both", expand=True)
+        
+        # Додај статусну траку
+        self.create_status_bar()
+        
+        # Учитавање PNG икона
+        if PIL_AVAILABLE:
             try:
                 icon_manager = get_icon_manager()
                 icon_manager.load_icons(self.root)
-                print("PNG иконе су успешно учитане")
+                self.update_status("PNG иконе су успешно учитане")
             except Exception as e:
-                print(f"Грешка при учитавању PNG икона: {e}")
+                self.update_status(f"Грешка при учитавању PNG икона: {e}", error=True)
+        
+        # Учитај подешавања
+        self.load_settings()
+        
+        # Учитај податке у посебној нити
+        self.load_data_async(self.putanja)
         
         self.setup_menu()
         self.setup_main_window()
-        self.root.minsize(550, 500)
-        # self.root.maxsize(800, 600)  # Allow unlimited expansion
+        self.root.minsize(800, 600)
         # Keyboard shortcuts
         self.root.bind_all("<Control-n>", lambda e: self.otvori_dodavanje())
         self.root.bind_all("<Control-s>", lambda e: self.save_current_form())  # Save shortcut
+        self.root.bind_all("<Control-f>", lambda e: self.otvori_pretragu())
+        self.root.bind_all("<Escape>", lambda e: self.go_back())
 
+    # Функција за креирање статусне траке
+    def create_status_bar(self):
+        """Креира статусну траку на дну прозора"""
+        status_frame = tk.Frame(self.root)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        self.status_bar = tk.Label(status_frame, text="Спремно", bd=1, relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Додај прогрес бар
+        self.progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, maximum=100)
+        self.progress_bar.pack(side=tk.RIGHT, padx=5)
+        self.progress_bar.pack_forget()  # Сакриј док није потребан
+    
+    # Функција за поновно учитавање података
+    def update_status(self, message, error=False):
+        """Ажурира статусну траку са поруком"""
+        if self.status_bar:
+            self.status_bar.config(text=message, fg="red" if error else "black")
+            self.root.update_idletasks()
+    
+    # Функција за приказује или сакрива прогрес бар
+    def show_progress(self, show=True):
+        """Приказује или сакрива прогрес бар"""
+        if show:
+            self.progress_bar.pack(side=tk.RIGHT, padx=5)
+        else:
+            self.progress_bar.pack_forget()
+        self.root.update_idletasks()
+    
+    # Функција за асинхроно учитавање података
+    def load_data_async(self, data_path):
+        """Учитава податке асинхроно у посебној нити"""
+        import threading
+        
+        def load_task():
+            self.update_status("Учитавање података...")
+            self.show_progress(True)
+            self.progress_var.set(10)
+            self.root.update_idletasks()
+            
+            try:
+                # Симулирај прогрес
+                import time
+                for i in range(10, 100, 10):
+                    time.sleep(0.1)  # Симулација дужег учитавања
+                    self.progress_var.set(i)
+                    self.root.update_idletasks()
+                
+                # Учитај податке
+                self.data = bib.ucitaj_podatke(data_path)
+                self.progress_var.set(100)
+                
+                # Ажурирај UI у главној нити
+                self.root.after(0, lambda: self.update_status(f"Учитано {len(self.data)} књига"))
+                self.root.after(100, lambda: self.show_progress(False))
+            except Exception as e:
+                self.root.after(0, lambda: self.update_status(f"Грешка при учитавању: {e}", error=True))
+                self.root.after(100, lambda: self.show_progress(False))
+        
+        # Покрени нит
+        thread = threading.Thread(target=load_task)
+        thread.daemon = True
+        thread.start()
+
+    # Функција за памћење података
     def save_current_form(self):
-        # Placeholder: implement if you want Ctrl+S to trigger save in current form
+        # Плацехолдер: имплементирајте ако желите да Ctrl+S изазове снимање у текућем облику
         pass
+    
+    # Функција за отварање прозора за претрагу
+    def otvori_pretragu(self):
         self.root.bind_all("<Control-f>", lambda e: self.otvori_pretragu())
         self.root.bind_all("<Escape>", lambda e: self.go_back())
 
     # Поставља главни прозор са дугметима за различите акције.
     def setup_main_window(self):
-        if hasattr(self, 'main_frame') and self.main_frame.winfo_exists():
-            self.main_frame.destroy()
-        # Уништава тренутни фрејм ако постоји    
+        """Поставља главни прозор са дугмадима и модерним UI елементима."""
         self.main_frame = tk.Frame(self.container)
-        self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+        self.container.grid_rowconfigure(0, weight=1)
+        self.container.grid_columnconfigure(0, weight=1)
         
+        # Стилизовани наслов са модерним изгледом
+        header_frame = tk.Frame(self.main_frame, bg="#3a7ebf")
+        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 15))
+        header_frame.grid_columnconfigure(0, weight=1)
+        
+        title_label = tk.Label(header_frame, text="Кућна библиотека", 
+                              font=("Helvetica", 18, "bold"), 
+                              fg="white", bg="#3a7ebf", 
+                              padx=10, pady=10)
+        title_label.grid(row=0, column=0)
+        
+        # Главни садржај у оквиру
+        content_frame = ttk.LabelFrame(self.main_frame, text=self._get_label('main_menu'))
+        content_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+        content_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        
+        # Команде за дугмад
         commands = [
             ("all_books", self.prikazi_knjige),
             ("search_books", self.otvori_pretragu),
@@ -139,18 +241,43 @@ class BibliotekaGUI:
         if 'pisci' in globals() and pisci:
             commands.append(("all_authors", self.prikazi_sve_pisce))
         
-        # Buttons with tooltips and shortcut info
+        # Додаје дугме за статистику
+        commands.append(("statistics", self.otvori_statistiku))
+        
+        # Пречице са тастатуре 
         shortcuts = {self.otvori_dodavanje: "Ctrl+N", self.otvori_pretragu: "Ctrl+F", self.go_back: "Esc"}
+        
+        # Креирамо модерни стил за дугмад
+        button_style = ttk.Style()
+        button_style.configure("Modern.TButton", font=("Helvetica", 11), padding=8)
+        
+        # Креирамо дугмад са иконама у модерном стилу
         for i, (key, command) in enumerate(commands):
+            # Креирамо оквир за дугме и опис
+            btn_frame = tk.Frame(content_frame)
+            btn_frame.grid(row=i, column=0, pady=5, padx=10, sticky="ew")
+            btn_frame.grid_columnconfigure(1, weight=1)
+            
             # Креирамо дугме са иконом
-            btn = self._create_button_with_icon(self.main_frame, key, command)
-            btn.grid(row=i, column=0, pady=5, padx=10, sticky="ew")
+            btn = self._create_button_with_icon(btn_frame, key, command, style="Modern.TButton")
+            btn.grid(row=0, column=0, padx=(0, 10))
+            
+            # Додајемо опис функције дугмета
+            text_only = TRANSLATIONS.get(self.settings.get('language', DEFAULT_SETTINGS['language']), 
+                                      TRANSLATIONS[DEFAULT_SETTINGS['language']]).get(key, key)
+            desc_label = tk.Label(btn_frame, text=text_only, anchor="w", justify="left")
+            desc_label.grid(row=0, column=1, sticky="w")
+            
+            # Додајемо tooltip са пречицом ако постоји
             sc = shortcuts.get(command)
             if sc:
-                # Узимамо само текст без иконе за tooltip
-                text_only = TRANSLATIONS.get(self.settings.get('language', DEFAULT_SETTINGS['language']), 
-                                          TRANSLATIONS[DEFAULT_SETTINGS['language']]).get(key, key)
                 ToolTip(btn, f"{text_only} ({sc})")
+        
+        # Додајемо информацију о верзији на дну
+        version_frame = tk.Frame(self.main_frame)
+        version_frame.grid(row=2, column=0, pady=(10, 5), sticky="ew")
+        version_label = tk.Label(version_frame, text="v0.2.0", fg="gray")
+        version_label.pack(side="right", padx=10)
         
         # Покажи главни фрејм само једном
         self.show_frame(self.main_frame)
@@ -188,7 +315,7 @@ class BibliotekaGUI:
             pisci_listbox.insert(tk.END, pisac)
         
         # Додаје дугме за претрагу књига од изабраног писца
-        def pretrazi_izabranog_pisca():
+        def pretrazi_izabranogpisca():
             selection = pisci_listbox.curselection()
             if selection:
                 pisac = pisci_listbox.get(selection[0])
@@ -196,7 +323,7 @@ class BibliotekaGUI:
             else:
                 messagebox.showinfo("Обавештење", "Најпре изаберите писца из листе.")
         
-        btn = ttk.Button(frame, text=self._get_label('search_author_books'), command=pretrazi_izabranog_pisca)
+        btn = ttk.Button(frame, text=self._get_label('search_author_books'), command=pretrazi_izabranogpisca)
         btn.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
         
         # Приказујемо само оквир са писцима
@@ -235,21 +362,34 @@ class BibliotekaGUI:
 
     # Додаје дугме "Назад" у фрејм
     def add_back_button(self, frame):
-        # Проналази последњи ред у фрејму
-        last_row = 0
-        for child in frame.grid_slaves():
-            last_row = max(last_row, child.grid_info()['row'])
         # Проверава да ли дугме "Назад" већ постоји
         back_button_exists = False
         for child in frame.grid_slaves():
             if isinstance(child, (tk.Button, ttk.Button)) and child.cget("text") in [self._get_label('back')]:
                 back_button_exists = True
                 break
+        
         # Ако дугме "Назад" не постоји, додаје ново
         if not back_button_exists:
-            # Креирамо дугме са иконом
-            btn = self._create_button_with_icon(frame, 'back', self.go_back)
-            btn.grid(row=last_row + 1, column=0, columnspan=2, pady=10, sticky="ew")
+            # Проверавамо да ли постоји посебан фрејм за дугме "Назад"
+            back_frame = None
+            for child in frame.grid_slaves():
+                if isinstance(child, tk.Frame) and child.grid_info()['row'] == 2:
+                    back_frame = child
+                    break
+            
+            # Ако постоји посебан фрејм за дугме "Назад" (као у статистици), користимо њега
+            if back_frame:
+                btn = self._create_button_with_icon(back_frame, 'back', self.go_back)
+                btn.pack(side=tk.LEFT, padx=10)
+            else:
+                # Проналази последњи ред у фрејму
+                last_row = 0
+                for child in frame.grid_slaves():
+                    last_row = max(last_row, child.grid_info()['row'])
+                # Креирамо дугме са иконом
+                btn = self._create_button_with_icon(frame, 'back', self.go_back)
+                btn.grid(row=last_row + 1, column=0, columnspan=2, pady=10, sticky="ew")
 
     # Враћа се на претходни фрејм
     def go_back(self):
@@ -289,32 +429,58 @@ class BibliotekaGUI:
             self.setup_main_window()
 
     # Додата помоћна функција за приказ у Разгранатом облику са клизачем
-    def create_treeview_with_scrollbar(self, frame, columns, column_widths):
-        # Креира табеларни приказ са клизачем
-        style = ttk.Style()
-        style.configure("Treeview", rowheight=25)  # Подешавање висине редова
+    def create_treeview_with_scrollbar(self, frame, columns, column_widths, tag_config=True):
+        """Креира модеран табеларни приказ са клизачем и напредним стиловима"""
+        # Креирамо оквир за табелу
+        table_frame = ttk.LabelFrame(frame, text=self._get_label('books_list'))
+        table_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
         
-        tree = ttk.Treeview(frame, columns=columns, show="headings")
+        # Креирамо модерне стилове за табелу
+        style = ttk.Style()
+        style.configure("Treeview", 
+                      rowheight=30,  # Већа висина редова
+                      font=("Helvetica", 10),
+                      background="#f0f0f0",
+                      fieldbackground="#f0f0f0")
+        
+        # Стил за заглавља колона
+        style.configure("Treeview.Heading", 
+                      font=("Helvetica", 10, "bold"),
+                      background="#e0e0e0")
+        
+        # Креирамо табелу
+        tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+        
+        # Подешавамо колоне
         for col, width in zip(columns, column_widths):
             tree.heading(col, text=col)
             tree.column(col, width=width, minwidth=50)
-            
-        # Додавање клизача
-        scrollbar_y = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
-        scrollbar_x = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
+        
+        # Додајемо клизаче
+        scrollbar_y = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+        scrollbar_x = ttk.Scrollbar(table_frame, orient="horizontal", command=tree.xview)
         tree.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
         
-        # Постављање компоненти
+        # Постављамо компоненте
         tree.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         scrollbar_y.grid(row=0, column=1, sticky="ns")
         scrollbar_x.grid(row=1, column=0, sticky="ew")
         
+        # Конфигуришемо тагове за различите статусе књига
+        if tag_config:
+            tree.tag_configure('dostupna', background='#e6ffe6')  # Светло зелена за доступне књиге
+            tree.tag_configure('pozajmljena', background='#ffe6e6')  # Светло црвена за позајмљене
+            tree.tag_configure('rezervisana', background='#fff2e6')  # Наранџаста за резервисане
+        
+        # Подешавамо да фрејм и табела попуне простор
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
         
         return tree
 
-    # Izmenjena funkcija prikazi_rezultate da koristi pomoćnu funkciju
+    # Изменена функција prikazi_rezultate да користи помоћну функцију
     def prikazi_rezultate(self, rezultati):
         if not rezultati:
             messagebox.showinfo(self._get_label('information'), self._get_label('no_books_found'))
@@ -328,21 +494,158 @@ class BibliotekaGUI:
         )
         self.show_frame(frame)
 
-    # Izmenjena funkcija prikazi_knjige da koristi pomoćnu funkciju i podržava više kolona
+    # Модеернизована функција prikazi_knjige са напредним UI елементима
     def prikazi_knjige(self):
+        """Приказује све књиге у модерном табеларном приказу са напредним функцијама"""
+        # Приказујемо индикатор учитавања
+        self.update_status(self._get_label('loading_data'))
+        self.show_progress(True)
+        self.progress_var.set(10)
+        self.root.update_idletasks()
+        
+        # Учитавамо податке
         podaci = bib.ucitaj_podatke(self.putanja)
+        self.progress_var.set(50)
+        self.root.update_idletasks()
+        
         if not podaci:
+            self.show_progress(False)
             messagebox.showinfo(self._get_label('information'), self._get_label('no_books_found'))
             return
+        
+        # Креирамо главни фрејм
         frame = self.create_new_frame()
+        frame.grid_rowconfigure(1, weight=1)  # Табела заузима већину простора
+        frame.grid_rowconfigure(2, weight=0)  # Доњи део за филтере и дугмад
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Додајемо наслов
+        header_frame = tk.Frame(frame, bg="#3a7ebf")
+        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 15))
+        header_frame.grid_columnconfigure(0, weight=1)
+        
+        title_label = tk.Label(header_frame, text=self._get_label('all_books'), 
+                              font=("Helvetica", 14, "bold"), 
+                              fg="white", bg="#3a7ebf", 
+                              padx=10, pady=5)
+        title_label.grid(row=0, column=0, sticky="w")
+        
+        # Додајемо информацију о броју књига
+        count_label = tk.Label(header_frame, text=f"{len(podaci)} {self._get_label('books_found')}", 
+                              font=("Helvetica", 10), 
+                              fg="white", bg="#3a7ebf", 
+                              padx=10, pady=5)
+        count_label.grid(row=0, column=1, sticky="e")
+        
+        # Дефинишемо колоне и ширине
         columns = ("Наслов", "Писац", "Година издавања", "Доступност")
-        column_widths = (200, 150, 100, 100)
+        column_widths = (250, 180, 120, 120)
+        
+        # Креирамо табеларни приказ са модерним стиловима
         tree = self.create_treeview_with_scrollbar(frame, columns, column_widths)
+        # Постављамо табелу у ред 1, испод наслова
+        tree.master.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        
+        # Додајемо податке у табелу са одговарајућим таговима за боје
         for knjiga in podaci:
             dostup = self._compute_availability(knjiga)
-            tree.insert("", "end", values=(knjiga.get("Наслов",""), knjiga.get("Писац",""), knjiga.get("Година издавања",""), dostup))
+            tag = 'dostupna' if dostup == "Доступна" else 'pozajmljena'
+            tree.insert("", "end", values=(
+                knjiga.get("Наслов",""), 
+                knjiga.get("Писац",""), 
+                knjiga.get("Година издавања",""), 
+                dostup
+            ), tags=(tag,))
         
-        def on_double(event):
+        # Додајемо панел са филтерима и дугмадима
+        control_frame = ttk.LabelFrame(frame, text=self._get_label('options'))
+        control_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+        control_frame.grid_columnconfigure(0, weight=1)
+        control_frame.grid_columnconfigure(1, weight=1)
+        control_frame.grid_columnconfigure(2, weight=1)
+        
+        # Додајемо поље за брзу претрагу
+        search_frame = tk.Frame(control_frame)
+        search_frame.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        
+        tk.Label(search_frame, text=self._get_label('quick_search')).pack(side=tk.LEFT, padx=5)
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(search_frame, textvariable=search_var, width=20)
+        search_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Функција за филтрирање по претрази
+        def filter_by_search(*args):
+            search_text = search_var.get().lower()
+            for item in tree.get_children():
+                values = tree.item(item, 'values')
+                if search_text in values[0].lower() or search_text in values[1].lower():
+                    tree.item(item, tags=tree.item(item, 'tags'))
+                else:
+                    tree.detach(item)  # Сакриј ставку
+            
+            # Ако је поље празно, прикажи све књиге
+            if not search_text:
+                tree.delete(*tree.get_children())
+                for knjiga in podaci:
+                    dostup = self._compute_availability(knjiga)
+                    tag = 'dostupna' if dostup == "Доступна" else 'pozajmljena'
+                    tree.insert("", "end", values=(
+                        knjiga.get("Наслов",""), 
+                        knjiga.get("Писац",""), 
+                        knjiga.get("Година издавања",""), 
+                        dostup
+                    ), tags=(tag,))
+        
+        # Повезујемо функцију са променом текста у пољу за претрагу
+        search_var.trace("w", filter_by_search)
+        
+        # Додајемо филтер за доступност
+        filter_frame = tk.Frame(control_frame)
+        filter_frame.grid(row=0, column=1, padx=5, pady=5)
+        
+        tk.Label(filter_frame, text=self._get_label('filter_by')).pack(side=tk.LEFT, padx=5)
+        filter_var = tk.StringVar(value="all")
+        filter_combo = ttk.Combobox(filter_frame, textvariable=filter_var, 
+                                  values=["all", "dostupna", "pozajmljena"], 
+                                  width=15, state="readonly")
+        filter_combo.pack(side=tk.LEFT, padx=5)
+        
+        # Функција за филтрирање по доступности
+        def filter_by_availability(*args):
+            filter_value = filter_var.get()
+            if filter_value == "all":
+                filter_by_search()  # Примени само текстуалну претрагу
+                return
+                
+            # Примени филтер доступности
+            tree.delete(*tree.get_children())
+            for knjiga in podaci:
+                dostup = self._compute_availability(knjiga)
+                tag = 'dostupna' if dostup == "Доступна" else 'pozajmljena'
+                
+                # Провери да ли књига задовољава филтер
+                if (filter_value == "dostupna" and dostup == "Доступна") or \
+                   (filter_value == "pozajmljena" and dostup != "Доступна"):
+                    # Провери и текстуалну претрагу
+                    search_text = search_var.get().lower()
+                    if not search_text or search_text in knjiga.get("Наслов","").lower() or \
+                       search_text in knjiga.get("Писац","").lower():
+                        tree.insert("", "end", values=(
+                            knjiga.get("Наслов",""), 
+                            knjiga.get("Писац",""), 
+                            knjiga.get("Година издавања",""), 
+                            dostup
+                        ), tags=(tag,))
+        
+        # Повезујемо функцију са променом вредности у комбо боксу
+        filter_var.trace("w", filter_by_availability)
+        
+        # Додајемо дугмад за акције
+        button_frame = tk.Frame(control_frame)
+        button_frame.grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        
+        # Дугме за детаље
+        def show_selected_details():
             sel = tree.selection()
             if not sel:
                 messagebox.showinfo(self._get_label('error'), self._get_label('no_book_selected'))
@@ -354,6 +657,14 @@ class BibliotekaGUI:
             else:
                 self.prikazi_detalje_knjige(naslov, podaci, frame)
         
+        details_btn = ttk.Button(button_frame, text=self._get_label('details'), 
+                               command=show_selected_details, style="Modern.TButton")
+        details_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Функције за догађаје
+        def on_double(event):
+            show_selected_details()
+        
         def on_right_click(event):
             # Прво селектујемо ставку на којој је кликнуто
             item = tree.identify_row(event.y)
@@ -363,8 +674,14 @@ class BibliotekaGUI:
                 # Приказујемо контекстни мени
                 self._show_context_menu(event, tree, podaci)
         
+        # Повезујемо догађаје
         tree.bind("<Double-1>", on_double)
         tree.bind("<Button-3>", on_right_click)  # Button-3 је десни клик
+        
+        # Сакривамо прогрес бар и приказујемо фрејм
+        self.progress_var.set(100)
+        self.update_status(self._get_label('data_loaded'))
+        self.root.after(500, lambda: self.show_progress(False))
         self.show_frame(frame)
 
     # Приказује контекстни мени за књигу
@@ -652,13 +969,15 @@ class BibliotekaGUI:
             # Брише књигу са датим насловом.
             naslov = unos.get()
             if naslov:
-                odgovor = messagebox.askyesno(self._get_label('confirmation'), f"Да ли сте сигурни да желите да обришете књигу '{naslov}'?")
-                if odgovor and bib.obrisi_knjigu(self.putanja, naslov):
-                    messagebox.showinfo(self._get_label('success'), self._get_label('book_deleted'))
+                odgovor = messagebox.askyesno("Потврда", f"Да ли сте сигурни да желите да обришете књигу '{naslov}'?")
+                if odgovor and bib.obrisi_knjigu(self.putanja, naslov):  # Fixed: replaced Cyrillic 'и' with 'and'
+                    messagebox.showinfo("Успех", "Књига је успешно обрисана.")
                     self.go_back()
                 else:
-                    messagebox.showerror(self._get_label('error'), self._get_label('book_not_found'))
-        tk.Button(frame, text=self._get_label('delete'), command=obrisi).grid(row=2, column=0, pady=5)
+                    messagebox.showerror("Грешка", "Књига није пронађена или је дошло до грешке при брисању.")
+        # Креирамо дугме за брисање са иконом
+        delete_btn = self._create_button_with_icon(frame, 'delete_book', obrisi)
+        delete_btn.grid(row=2, column=0, pady=5)
         self.show_frame(frame)
     
     # Отвара форму за претрагу књига
@@ -669,7 +988,7 @@ class BibliotekaGUI:
         # Освежавамо листе писаца, жанрова и издавача
         global zanr, izdavac, pisci
         try:
-            podaci = bib.inicijalizuj_podatke(self.putanja)
+            podaci = bib.inicijalизуј_podatке(self.putanja)
             zanr = podaci['zanr']
             izdavac = podaci['izdavac']
             pisci = podaci['pisci']
@@ -690,7 +1009,7 @@ class BibliotekaGUI:
             elif field == "Издавач":
                 entry = ttk.Combobox(frame, values=izdavac, width=25)
             elif field == "Повез":
-                entry = ttk.Combobox(frame, values=povez, width=25)
+                entry = ttk.Combobox(frame, values=poveз, width=25)
             else:
                 entry = tk.Entry(frame, width=25)
             entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="w")
@@ -714,76 +1033,6 @@ class BibliotekaGUI:
         search_btn.grid(row=len(fields)+1, column=0, columnspan=2, pady=10)
         self.show_frame(frame)
     
-    # Приказује детаље о књизи
-    def prikazi_detalje_knjige(self, naslov, podaci, parent_frame):
-        knjiga = next((k for k in podaci if k["Наслов"] == naslov), None)
-        if not knjiga:
-            messagebox.showinfo(self._get_label('error'), self._get_label('book_not_found'))
-            return
-        # Уништава тренутни фрејм
-        details_frame = self.create_new_frame()
-        tk.Label(details_frame, text=f"{self._get_label('details')} {naslov}", font=("Helvetica", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
-        text_details = tk.Text(details_frame, wrap=tk.WORD, width=40, height=10)
-        text_details.grid(row=1, column=0, columnspan=2, padx=10, pady=5)
-        details = ""
-        # Приказује детаље о књизи
-        for kljuc, vrednost in knjiga.items():
-            if kljuc == "Писац":
-                autori = bib.podeli_pisce(vrednost) if hasattr(bib, 'podeli_pisce') else vrednost.split(';')
-                autori = [autor.strip() for autor in autori if autor.strip()]
-                if len(autori) > 1:
-                    details += f"{kljuc}:\n"
-                    for autor in autori:
-                        details += f"  - {autor}\n"
-                else:
-                    details += f"{kljuc}: {vrednost}\n"
-            elif kljuc == "Издавачи":
-                izdavaci = vrednost.split(';')
-                izdavaci = [izdavac.strip() for izdavac in izdavaci if izdavac.strip()]
-                if len(izdavaci) > 1:
-                    details += f"{kljuc}:\n"
-                    for izdavac in izdavaci:
-                        details += f"  - {izdavac}\n"
-                else:
-                    details += f"{kljuc}: {vrednost}\n"
-            else:
-                details += f"{kljuc}: {vrednost}\n"
-        text_details.insert(tk.END, details)
-        text_details.config(state=tk.DISABLED)
-        
-        # Ако књига има више писаца, додајемо дугме за претрагу по писцу
-        if "Писац" in knjiga:
-            autori = bib.podeli_pisce(knjiga["Писац"]) if hasattr(bib, 'podeli_pisce') else [a.strip() for a in knjiga["Писац"].split(';')]
-            autori = [a for a in autori if a.strip()]  # Уклањамо празне вредности
-
-            if len(autori) > 0:
-                # Креира оквир за дугмад
-                buttons_frame = tk.Frame(details_frame)
-                buttons_frame.grid(row=2, column=0, columnspan=2, pady=5)
-                tk.Label(buttons_frame, text=self._get_label('search_author_books_this'), font=("Helvetica", 10, "bold")).grid(row=0, column=0, columnspan=2, pady=5)
-
-                # Одређујемо број колона за дугмад (максимално 5 дугмета по реду)
-                max_buttons_per_row = 5
-
-                # За сваког писца додаје дугме
-                for i, autor in enumerate(autori):
-                    if autor.strip():
-                        # Израчунава ред и колону за дугме
-                        row = (i // max_buttons_per_row) + 1
-                        col = i % max_buttons_per_row
-
-                        pisac_btn = tk.Button(buttons_frame, text=autor,
-                                             command=lambda a=autor: self.pretrazi_po_piscu(a))
-                        pisac_btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
-
-                # Конфигуришемо колоне да буду једнаке ширине
-                for i in range(min(max_buttons_per_row, len(autori))):
-                    buttons_frame.grid_columnconfigure(i, weight=1)
-        
-        tk.Button(details_frame, text=self._get_label('back'), command=self.go_back).grid(row=3, column=0, columnspan=2, pady=10)
-        self.show_frame(details_frame)
-
-    # Претрага по писцу
     def pretrazi_po_piscu(self, pisac):
         """Претражује књиге одређеног писца."""
         kriterijumi = {"Писац": pisac}
@@ -795,6 +1044,7 @@ class BibliotekaGUI:
 
     # Креира нови фрејм
     def create_new_frame(self):
+        """Креира нови фрејм за приказ садржаја"""
         frame = tk.Frame(self.container)
         frame.grid_columnconfigure(0, weight=0)
         frame.grid_columnconfigure(1, weight=1)
@@ -835,26 +1085,31 @@ class BibliotekaGUI:
             return f"{ICONS[key]} {text}"
         return text
     
-    def _create_button_with_icon(self, parent, key, command, **kwargs):
-        """Креира дугме са иконом ако је доступна"""
+    def _create_button_with_icon(self, parent, key, command, style=None, **kwargs):
+        """Креира дугме са иконом ако је доступна, са опционим стилом"""
         use_png_icons = self.settings.get('use_png_icons', True) and ICON_SUPPORT and PIL_AVAILABLE
         show_icons = self.settings.get('show_icons', True)
         
         text = self._get_label(key)
         
-        btn = ttk.Button(parent, text=text, command=command, **kwargs)
+        # Додајемо стил ако је прослеђен
+        if style:
+            kwargs['style'] = style
         
-        # Додајемо PNG икону ако је укључено
+        # Ако користимо PNG иконе и подржане су
         if use_png_icons and show_icons:
             icon_manager = get_icon_manager()
-            # Проследи root прозор кроз родитељски виџет
-            root = parent.winfo_toplevel() if hasattr(parent, 'winfo_toplevel') else self.root
-            icon = icon_manager.get_icon(key, root)
+            icon = icon_manager.get_icon(key)
             if icon:
-                btn.config(image=icon, compound=tk.LEFT)
-                # Чувамо референцу на икону да не би била уклоњена од сакупљача отпада
-                btn.icon = icon
+                btn = ttk.Button(parent, text=text, image=icon, compound=tk.LEFT, command=command, **kwargs)
+                return btn
         
+        # Ако користимо Unicode иконе или PNG нису доступне
+        if show_icons and key in ICONS:
+            btn = ttk.Button(parent, text=f"{ICONS[key]} {text}", command=command, **kwargs)
+        else:
+            btn = ttk.Button(parent, text=text, command=command, **kwargs)
+            
         return btn
 
     def setup_menu(self):
@@ -974,6 +1229,315 @@ class BibliotekaGUI:
         
         self.show_frame(frame)
 
+    def prikazi_detalje_knjige(self, naslov, podaci, parent_frame):
+        """Модернизовани приказ детаља књиге са напредним UI елементима"""
+        # Прикажи индикатор учитавања
+        self.update_status(self._get_label('loading_data'))
+        self.show_progress(True)
+        self.progress_var.set(10)
+        
+        # Креирај нови фрејм за детаље књиге
+        frame = self.create_new_frame()
+        
+        # Пронађи књигу са датим насловом
+        knjiga = None
+        for k in podaci:
+            if k.get('Наслов') == naslov:
+                knjiga = k
+                break
+                
+        if not knjiga:
+            self.update_status(f"Књига '{naslov}' није пронађена", error=True)
+            self.show_progress(False)
+            return
+            
+        self.progress_var.set(30)
+        
+        # Креирај модерни хедер
+        header_frame = tk.Frame(frame, bg="#2c3e50")
+        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        frame.grid_columnconfigure(0, weight=1)
+        
+        # Наслов књиге у хедеру
+        title_label = tk.Label(header_frame, text=naslov, font=("Helvetica", 16, "bold"), 
+                              fg="white", bg="#2c3e50", anchor="w", padx=10, pady=10)
+        title_label.grid(row=0, column=0, sticky="ew")
+        header_frame.grid_columnconfigure(0, weight=1)
+        
+        # Статус доступности
+        dostupnost = "Доступна" if knjiga.get('Позајмљено') != "Да" else "Није доступна"
+        status_color = "#27ae60" if dostupnost == "Доступна" else "#e74c3c"
+        status_frame = tk.Frame(header_frame, bg=status_color, padx=10, pady=5)
+        status_frame.grid(row=0, column=1, padx=10)
+        status_label = tk.Label(status_frame, text=self._get_label('available' if dostupnost == "Доступна" else 'not_available'), 
+                               fg="white", bg=status_color, font=("Helvetica", 10, "bold"))
+        status_label.pack()
+        
+        self.progress_var.set(50)
+        
+        # Креирај таб контролу за организацију информација
+        tab_control = ttk.Notebook(frame)
+        tab_control.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        frame.grid_rowconfigure(1, weight=1)
+        
+        # Таб за основне информације
+        tab_basic = ttk.Frame(tab_control)
+        tab_control.add(tab_basic, text=self._get_label('basic_info'))
+        
+        # Таб за додатне информације
+        tab_additional = ttk.Frame(tab_control)
+        tab_control.add(tab_additional, text=self._get_label('additional_info'))
+        
+        # Таб за информације о позајмици (ако је књига позајмљена)
+        if dostupnost == "Није доступна":
+            tab_loan = ttk.Frame(tab_control)
+            tab_control.add(tab_loan, text=self._get_label('loan_info'))
+        
+        # Попуни основне информације
+        basic_info_frame = ttk.LabelFrame(tab_basic, text=self._get_label('book_info'))
+        basic_info_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Креирај мрежу за основне информације
+        row = 0
+        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал"]
+        for field in fields:
+            ttk.Label(basic_info_frame, text=f"{field}:", font=("Helvetica", 10, "bold")).grid(
+                row=row, column=0, sticky="w", padx=10, pady=5)
+            
+            # За поље "Писац" можемо имати више аутора
+            if field == "Писац" and knjiga.get(field):
+                authors = knjiga.get(field).split("; ")
+                authors_frame = ttk.Frame(basic_info_frame)
+                authors_frame.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+                
+                for i, author in enumerate(authors):
+                    author_label = ttk.Label(authors_frame, text=author)
+                    author_label.grid(row=i, column=0, sticky="w")
+                    
+                    # Додај дугме за приказ свих књига овог аутора
+                    author_btn = ttk.Button(authors_frame, text="📚", width=2, 
+                                          command=lambda a=author: self.pretrazi_po_piscu(a))
+                    author_btn.grid(row=i, column=1, padx=5)
+                    ToolTip(author_btn, f"Прикажи све књиге аутора: {author}")
+            else:
+                value = knjiga.get(field, "")
+                ttk.Label(basic_info_frame, text=value).grid(
+                    row=row, column=1, sticky="w", padx=10, pady=5)
+            row += 1
+        
+        # Попуни додатне информације
+        additional_info_frame = ttk.LabelFrame(tab_additional, text=self._get_label('additional_info'))
+        additional_info_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        row = 0
+        add_fields = ["Колекција", "Издавачи", "ИСБН", "Повез", "Напомена"]
+        for field in add_fields:
+            field_name = field
+            if field == "Издавачи" and "Издавач" in knjiga and not "Издавачи" in knjiga:
+                field_name = "Издавач"
+                
+            ttk.Label(additional_info_frame, text=f"{field}:", font=("Helvetica", 10, "bold")).grid(
+                row=row, column=0, sticky="w", padx=10, pady=5)
+            
+            # За поље "Издавачи" можемо имати више издавача
+            if field_name in ["Издавачи", "Издавач"] and knjiga.get(field_name):
+                publishers = knjiga.get(field_name).split("; ")
+                publishers_frame = ttk.Frame(additional_info_frame)
+                publishers_frame.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+                
+                for i, publisher in enumerate(publishers):
+                    ttk.Label(publishers_frame, text=publisher).grid(row=i, column=0, sticky="w")
+            else:
+                value = knjiga.get(field_name, "")
+                ttk.Label(additional_info_frame, text=value).grid(
+                    row=row, column=1, sticky="w", padx=10, pady=5)
+            row += 1
+        
+        # Ако је књига позајмљена, попуни информације о позајмици
+        if dostupnost == "Није доступна":
+            loan_info_frame = ttk.LabelFrame(tab_loan, text=self._get_label('loan_info'))
+            loan_info_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            loan_fields = ["Особа", "Датум позајмице", "Рок враћања", "Напомена"]
+            loan_data = self._get_loan_data(naslov)
+            
+            if loan_data:
+                for i, field in enumerate(loan_fields):
+                    ttk.Label(loan_info_frame, text=f"{field}:", font=("Helvetica", 10, "bold")).grid(
+                        row=i, column=0, sticky="w", padx=10, pady=5)
+                    ttk.Label(loan_info_frame, text=loan_data.get(field, "")).grid(
+                        row=i, column=1, sticky="w", padx=10, pady=5)
+            else:
+                ttk.Label(loan_info_frame, text="Нема доступних информација о позајмици.").grid(
+                    row=0, column=0, columnspan=2, padx=10, pady=20)
+        
+        self.progress_var.set(80)
+        
+        # Дугмад за акције
+        actions_frame = ttk.Frame(frame)
+        actions_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+        
+        # Дугме за измену књиге
+        edit_btn = self._create_button_with_icon(actions_frame, 'edit_book', 
+                                             lambda: self.otvori_izmenu(naslov), style="Modern.TButton")
+        edit_btn.grid(row=0, column=0, padx=5, pady=5)
+        
+        # Дугме за брисање књиге
+        delete_btn = self._create_button_with_icon(actions_frame, 'delete_book', 
+                                               lambda: self._confirm_delete_book(naslov), style="Modern.TButton")
+        delete_btn.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Дугме за позајмицу/враћање књиге
+        if dostupnost == "Доступна":
+            loan_btn = self._create_button_with_icon(actions_frame, 'loan_book', 
+                                                 lambda: self._loan_book(naslov), style="Modern.TButton")
+            loan_btn.grid(row=0, column=2, padx=5, pady=5)
+        else:
+            return_btn = self._create_button_with_icon(actions_frame, 'return_book', 
+                                                   lambda: self._return_book(naslov), style="Modern.TButton")
+            return_btn.grid(row=0, column=2, padx=5, pady=5)
+        
+        # Дугме за повратак на претходни приказ
+        back_btn = self._create_button_with_icon(actions_frame, 'back', 
+                                             lambda: self.show_frame(parent_frame), style="Modern.TButton")
+        back_btn.grid(row=0, column=3, padx=5, pady=5)
+        
+        self.progress_var.set(100)
+        self.update_status(self._get_label('data_loaded'))
+        self.show_progress(False)
+        
+        # Прикажи фрејм
+        self.show_frame(frame)
+    
+    def _get_loan_data(self, naslov):
+        """Dobavlja informacije o pozajmici knjige"""
+        try:
+            return bib.pretraga_pozajmica(self.putanja, naslov)
+        except Exception as e:
+            print(f"[DEBUG] Greska pri dobaljivanju informacija o pozajmici: {e}")
+            return None
+    
+    def _confirm_delete_book(self, naslov):
+        """Потврда брисања књиге"""
+        odgovor = messagebox.askyesno("Потврда", f"Да ли сте сигурни да желите да обришете књигу '{naslov}'?")
+        if odgovor and bib.obrisi_knjigu(self.putanja, naslov):
+            messagebox.showinfo("Успех", "Књига је успешно обрисана.")
+            self.go_back()
+        elif odgovor:
+            messagebox.showerror("Грешка", "Књига није пронађена или је дошло до грешке при брисању.")
+    
+    def _loan_book(self, naslov):
+        """Отвара дијалог за позајмицу књиге"""
+        # Креирање дијалога за позајмицу књиге
+        loan_dialog = tk.Toplevel(self.root)
+        loan_dialog.title(self.translations.get('loan_book'))
+        loan_dialog.geometry("400x250")
+        loan_dialog.resizable(False, False)
+        loan_dialog.transient(self.root)  # Поставља модални дијалог
+        loan_dialog.grab_set()  # Модални дијалог
+        
+        # Центрирање дијалога
+        self._center_window(loan_dialog)
+        
+        # Креирање оквира за унос података
+        frame = ttk.Frame(loan_dialog, padding="10")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Наслов књиге (само приказ)
+        ttk.Label(frame, text=self.translations.get('title') + ":", font=("TkDefaultFont", 10, "bold")).grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Label(frame, text=naslov).grid(row=0, column=1, sticky="w", pady=5)
+        
+        # Поље за унос особе која позајмљује
+        ttk.Label(frame, text=self.translations.get('loaned_to') + ":", font=("TkDefaultFont", 10, "bold")).grid(row=1, column=0, sticky="w", pady=5)
+        borrower_entry = ttk.Entry(frame, width=30)
+        borrower_entry.grid(row=1, column=1, sticky="w", pady=5)
+        borrower_entry.focus_set()  # Фокус на поље за унос
+        
+        # Датум позајмице (данашњи датум)
+        ttk.Label(frame, text=self.translations.get('loan_date') + ":", font=("TkDefaultFont", 10, "bold")).grid(row=2, column=0, sticky="w", pady=5)
+        loan_date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
+        loan_date_entry = ttk.Entry(frame, textvariable=loan_date_var, width=15)
+        loan_date_entry.grid(row=2, column=1, sticky="w", pady=5)
+        
+        # Очекивани датум враћања (опционо)
+        ttk.Label(frame, text=self.translations.get('return_date') + " " + self.translations.get('optional') + ":", font=("TkDefaultFont", 10)).grid(row=3, column=0, sticky="w", pady=5)
+        return_date_var = tk.StringVar()
+        return_date_entry = ttk.Entry(frame, textvariable=return_date_var, width=15)
+        return_date_entry.grid(row=3, column=1, sticky="w", pady=5)
+        
+        # Напомена (опционо)
+        ttk.Label(frame, text=self.translations.get('notes') + " " + self.translations.get('optional') + ":", font=("TkDefaultFont", 10)).grid(row=4, column=0, sticky="w", pady=5)
+        notes_text = tk.Text(frame, width=30, height=3)
+        notes_text.grid(row=4, column=1, sticky="w", pady=5)
+        
+        # Дугмад за потврду и отказивање
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
+        
+        # Функција за позајмицу књиге
+        def confirm_loan():
+            borrower = borrower_entry.get().strip()
+            if not borrower:
+                messagebox.showerror(self.translations.get('error'), self.translations.get('enter_borrower_name'))
+                return
+            
+            try:
+                loan_date_str = loan_date_var.get()
+                loan_date = datetime.strptime(loan_date_str, "%Y-%m-%d").date() if loan_date_str else None
+                
+                return_date_str = return_date_var.get()
+                return_date = datetime.strptime(return_date_str, "%Y-%m-%d").date() if return_date_str else None
+                
+                notes = notes_text.get("1.0", tk.END).strip()
+                
+                # Позајми књигу
+                success = bib.pozajmi_knjigu(self.putanja, naslov, borrower, loan_date, return_date, notes)
+                if success:
+                    messagebox.showinfo(self.translations.get('success'), self.translations.get('book_loaned'))
+                    loan_dialog.destroy()
+                    # Освежи приказ детаља књиге
+                    self.go_back()
+                    self.prikazi_detalje_knjige(naslov)
+                else:
+                    messagebox.showerror(self.translations.get('error'), self.translations.get('error_loaning_book'))
+            except ValueError as e:
+                messagebox.showerror(self.translations.get('error'), str(e))
+        
+        # Дугмад за потврду и отказивање
+        ttk.Button(btn_frame, text=self.translations.get('confirm'), command=confirm_loan).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text=self.translations.get('cancel'), command=loan_dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def _return_book(self, naslov):
+        """Враћа позајмљену књигу"""
+        # Потврда враћања књиге
+        odgovor = messagebox.askyesno(
+            self.translations.get('confirm'), 
+            self.translations.get('confirm_return_book')
+        )
+        
+        if odgovor:
+            try:
+                # Врати књигу
+                success = bib.vrati_knjigu(self.putanja, naslov)
+                if success:
+                    messagebox.showinfo(self.translations.get('success'), self.translations.get('book_returned'))
+                    # Освежи приказ детаља књиге
+                    self.go_back()
+                    self.prikazi_detalje_knjige(naslov)
+                else:
+                    messagebox.showerror(self.translations.get('error'), self.translations.get('error_returning_book'))
+            except ValueError as e:
+                messagebox.showerror(self.translations.get('error'), str(e))
+                
+    def _center_window(self, window):
+        """Центрира прозор на екрану"""
+        window.update_idletasks()
+        width = window.winfo_width()
+        height = window.winfo_height()
+        x = (window.winfo_screenwidth() // 2) - (width // 2)
+        y = (window.winfo_screenheight() // 2) - (height // 2)
+        window.geometry(f'{width}x{height}+{x}+{y}')
+    
     def _show_about_program(self):
         """Display program information in the main frame"""
         # Create a new frame for program information
@@ -1098,29 +1662,89 @@ class BibliotekaGUI:
         btn_apply.grid(row=3, column=0, columnspan=2, pady=10)
 
     def otvori_statistiku(self):
-        # Израчунава и приказује статистику библиотеке у табовима
-        data = bib.ucitaj_podatke(self.putanja)
-        total = ukupno_knjiga(data)
-        authors = ukupno_auta(data, bib.podeli_pisce)
-        genres = broj_zanrova(data)
-        series = broj_serijala(data)
-        loans = broj_pozajmica(data)
-        knjige_zanr = knjige_po_zanru(data)
-        knjige_izdavac = knjige_po_izdavacu(data)
-        top5 = top_autori(data, bib.podeli_pisce)
+        """Модернизовани приказ статистике библиотеке са графиконима"""
+        # Прикажи индикатор учитавања
+        self.update_status("Учитавање статистике...")
+        self.show_progress(True)
+        self.progress_var.set(10)
+        
+        # Креирај нови фрејм за статистику
         frame = self.create_new_frame()
+        
+        # Асинхроно учитавање података и израчунавање статистике
+        import threading
+        
+        def load_stats():
+            try:
+                # Учитај податке
+                data = bib.ucitaj_podatke(self.putanja)
+                self.progress_var.set(30)
+                
+                # Израчунај основне статистике
+                total = ukupno_knjiga(data)
+                authors = ukupno_autora(data, bib.podeli_pisce)
+                genres = broj_zanrova(data)
+                series = broj_serijala(data)
+                loans = broj_pozajmica(data)
+                self.progress_var.set(50)
+                
+                # Израчунај детаљне статистике
+                knjige_zanr = knjige_po_zanru(data)
+                knjige_izdavac = knjige_po_izdavacu(data)
+                top5 = top_autori(data, bib.podeli_pisce)
+                self.progress_var.set(70)
+                
+                # Ажурирај UI у главној нити
+                self.root.after(0, lambda: self._display_statistics(
+                    frame, total, authors, genres, series, loans,
+                    knjige_zanr, knjige_izdavac, top5
+                ))
+            except Exception as e:
+                self.root.after(0, lambda: self.update_status(f"Грешка при учитавању статистике: {e}", error=True))
+                self.root.after(0, lambda: self.show_progress(False))
+        
+        # Покрени нит за учитавање
+        thread = threading.Thread(target=load_stats)
+        thread.daemon = True
+        thread.start()
+        
+        # Прикажи фрејм одмах
+        self.show_frame(frame)
+    
+    def _display_statistics(self, frame, total, authors, genres, series, loans, knjige_zanr, knjige_izdavac, top5):
+        """Приказује статистику у модерном интерфејсу са графиконима"""
+        # Ажурирај прогрес
+        self.progress_var.set(80)
+        
         # Креирај посебан фрејм за заглавље
         header_frame = tk.Frame(frame)
         header_frame.grid(row=0, column=0, sticky="ew")
-        tk.Label(header_frame, text=self._get_label('statistics'), font=("Helvetica",14,"bold")).grid(row=0, column=0, pady=10, sticky="ew")
-        # Таб контрола
+        tk.Label(header_frame, text=self._get_label('statistics'), 
+                font=("Helvetica", 16, "bold")).grid(row=0, column=0, pady=10, sticky="ew")
+        
+        # Таб контрола са модерним изгледом
         tab_control = ttk.Notebook(frame)
         tab_control.grid(row=1, column=0, sticky="nsew")
         frame.grid_rowconfigure(1, weight=1)
         frame.grid_columnconfigure(0, weight=1)
-        # --- Опште ---
-        tab_opste = tk.Frame(tab_control)
+        
+        # Додај посебан ред за дугме "Назад" - биће додато касније у show_frame методи
+        # Ово спречава додавање дугмета испод табова
+        back_button_frame = tk.Frame(frame)
+        back_button_frame.grid(row=2, column=0, sticky="w", pady=10)
+        frame.grid_rowconfigure(2, weight=0)
+        
+        # --- Опште статистике са графиконом ---
+        tab_opste = ttk.Frame(tab_control)
         tab_control.add(tab_opste, text=self._get_label('tab_general'))
+        tab_opste.grid_columnconfigure(0, weight=1)
+        tab_opste.grid_columnconfigure(1, weight=1)
+        tab_opste.grid_rowconfigure(5, weight=1)  # За графикон
+        
+        # Приказ основних статистика у модерном стилу
+        stats_frame = ttk.LabelFrame(tab_opste, text=self._get_label('general_stats'))
+        stats_frame.grid(row=0, column=0, rowspan=5, sticky="nsew", padx=10, pady=10)
+        
         for idx, (label, val) in enumerate([
             (self._get_label('stat_total_books'), total),
             (self._get_label('stat_total_authors'), authors),
@@ -1128,54 +1752,165 @@ class BibliotekaGUI:
             (self._get_label('stat_series'), series),
             (self._get_label('stat_loans'), loans)
         ]):
-            tk.Label(tab_opste, text=f"{label}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=10, pady=5)
-            tk.Label(tab_opste, text=str(val), anchor='w').grid(row=idx, column=1, sticky="w", padx=10, pady=5)
-        # --- По жанру ---
-        tab_zanr = tk.Frame(tab_control)
-        tab_control.add(tab_zanr, text=self._get_label('tab_genre'))
-        for idx, (zanr, br) in enumerate(sorted(knjige_zanr.items())):
-            tk.Label(tab_zanr, text=f"{zanr}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=20, pady=2)
-            tk.Label(tab_zanr, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", pady=2)
-        # --- По издавачу ---
-        tab_izdavac = tk.Frame(tab_control)
-        tab_control.add(tab_izdavac, text=self._get_label('tab_publisher'))
-        for idx, (izd, br) in enumerate(sorted(knjige_izdavac.items())):
-            tk.Label(tab_izdavac, text=f"{izd}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=20, pady=2)
-            tk.Label(tab_izdavac, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", pady=2)
-        # --- Топ 5 аутора ---
-        tab_autori = tk.Frame(tab_control)
-        tab_control.add(tab_autori, text=self._get_label('tab_top_authors'))
-        for idx, (autor, br) in enumerate(top5):
-            tk.Label(tab_autori, text=f"{autor}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=20, pady=2)
-            tk.Label(tab_autori, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", pady=2)
-        # --- Дијаграм доступности ---
-        tab_dijagram = tk.Frame(tab_control)
-        tab_control.add(tab_dijagram, text=self._get_label('tab_chart'))
+            ttk.Label(stats_frame, text=f"{label}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=10, pady=5)
+            value_label = ttk.Label(stats_frame, text=str(val), anchor='w')
+            value_label.grid(row=idx, column=1, sticky="w", padx=10, pady=5)
+            # Додај стилизацију за вредности
+            if idx == 0:  # Укупан број књига
+                value_label.configure(font=("Helvetica", 10, "bold"))
+        
+        # Графикон доступности књига
         if Figure:
+            chart_frame = ttk.LabelFrame(tab_opste, text=self._get_label('availability_chart'))
+            chart_frame.grid(row=0, column=1, rowspan=5, sticky="nsew", padx=10, pady=10)
+            
             labels_chart = [self._get_label('available'), self._get_label('loaned')]
             sizes = [total-loans, loans]
-            fig = Figure(figsize=(4,3))
+            colors = ['#4CAF50', '#FFC107']  # Зелена и жута
+            
+            fig = Figure(figsize=(4, 3), dpi=100)
             ax = fig.add_subplot(111)
-            ax.pie(sizes, labels=labels_chart, autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            canvas = FigureCanvasTkAgg(fig, master=tab_dijagram)
+            wedges, texts, autotexts = ax.pie(sizes, labels=None, autopct='%1.1f%%', 
+                                             startangle=90, colors=colors)
+            ax.axis('equal')  # Једнаке пропорције за кружни изглед
+            
+            # Додај легенду
+            ax.legend(wedges, labels_chart, title=self._get_label('status'),
+                     loc="center left", bbox_to_anchor=(0.9, 0, 0.5, 1))
+            
+            # Побољшај изглед текста процената
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+            
+            canvas = FigureCanvasTkAgg(fig, master=chart_frame)
             canvas.draw()
-            canvas.get_tk_widget().grid(row=0, column=0, pady=10)
-        else:
-            tk.Label(tab_dijagram, text=self._get_label('matplotlib_error'), fg="red").grid(row=0, column=0, pady=10)
-        self.show_frame(frame)
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # --- По жанру са графиконом ---
+        tab_zanr = ttk.Frame(tab_control)
+        tab_control.add(tab_zanr, text=self._get_label('tab_genre'))
+        tab_zanr.grid_columnconfigure(0, weight=1)
+        tab_zanr.grid_columnconfigure(1, weight=1)
+        
+        # Листа жанрова
+        zanr_frame = ttk.LabelFrame(tab_zanr, text=self._get_label('genres_list'))
+        zanr_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # Креирај скроловану листу жанрова
+        zanr_scroll = ScrollableFrame(zanr_frame)
+        zanr_scroll.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        for idx, (zanr, br) in enumerate(sorted(knjige_zanr.items(), key=lambda x: x[1], reverse=True)):
+            ttk.Label(zanr_scroll.scrollable_frame, text=f"{zanr}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=10, pady=2)
+            ttk.Label(zanr_scroll.scrollable_frame, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", padx=10, pady=2)
+        
+        # Графикон жанрова (top 5)
+        if Figure and knjige_zanr:
+            chart_frame = ttk.LabelFrame(tab_zanr, text=self._get_label('top_genres_chart'))
+            chart_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+            
+            # Узми 5 најчешћих жанрова
+            top_zanrovi = sorted(knjige_zanr.items(), key=lambda x: x[1], reverse=True)[:5]
+            labels = [zanr for zanr, _ in top_zanrovi]
+            values = [br for _, br in top_zanrovi]
+            
+            fig = Figure(figsize=(5, 4), dpi=100)
+            ax = fig.add_subplot(111)
+            bars = ax.bar(labels, values, color='#2196F3')
+            
+            # Додај вредности изнад стубића
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                        f'{int(height)}', ha='center', va='bottom')
+            
+            ax.set_ylabel(self._get_label('book_count'))
+            ax.set_title(self._get_label('top_genres'))
+            fig.tight_layout()
+            
+            # Ротирај лабеле за боље уклапање
+            plt = ax.get_xticklabels()
+            for label in plt:
+                label.set_rotation(45)
+                label.set_ha('right')
+            
+            canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # --- По издавачу ---
+        tab_izdavac = ttk.Frame(tab_control)
+        tab_control.add(tab_izdavac, text=self._get_label('tab_publisher'))
+        
+        # Листа издавача
+        izdavac_frame = ttk.LabelFrame(tab_izdavac, text=self._get_label('publishers_list'))
+        izdavac_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Креирај скроловану листу издавача
+        izdavac_scroll = ScrollableFrame(izdavac_frame)
+        izdavac_scroll.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        for idx, (izd, br) in enumerate(sorted(knjige_izdavac.items(), key=lambda x: x[1], reverse=True)):
+            ttk.Label(izdavac_scroll.scrollable_frame, text=f"{izd}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=10, pady=2)
+            ttk.Label(izdavac_scroll.scrollable_frame, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", padx=10, pady=2)
+        
+        # --- Топ 5 аутора са графиконом ---
+        tab_autori = ttk.Frame(tab_control)
+        tab_control.add(tab_autori, text=self._get_label('tab_top_authors'))
+        tab_autori.grid_columnconfigure(0, weight=1)
+        tab_autori.grid_columnconfigure(1, weight=1)
+        
+        # Листа топ аутора
+        autori_frame = ttk.LabelFrame(tab_autori, text=self._get_label('top_authors_list'))
+        autori_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        for idx, (autor, br) in enumerate(top5):
+            ttk.Label(autori_frame, text=f"{idx+1}. {autor}:", anchor='w').grid(row=idx, column=0, sticky="w", padx=10, pady=2)
+            ttk.Label(autori_frame, text=str(br), anchor='w').grid(row=idx, column=1, sticky="w", padx=10, pady=2)
+        
+        # Графикон топ аутора
+        if Figure and top5:
+            chart_frame = ttk.LabelFrame(tab_autori, text=self._get_label('top_authors_chart'))
+            chart_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+            
+            labels = [autor for autor, _ in top5]
+            values = [br for _, br in top5]
+            
+            fig = Figure(figsize=(5, 4), dpi=100)
+            ax = fig.add_subplot(111)
+            
+            # Хоризонтални бар график за боље приказивање дугих имена аутора
+            bars = ax.barh(labels, values, color='#9C27B0')  # Љубичаста боја
+            
+            # Додај вредности на крају сваког бара
+            for i, v in enumerate(values):
+                ax.text(v + 0.1, i, str(v), va='center')
+            
+            ax.set_xlabel(self._get_label('book_count'))
+            ax.set_title(self._get_label('top_authors'))
+            fig.tight_layout()
+            
+            canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Сакриј прогрес бар и ажурирај статус
+        self.progress_var.set(100)
+        self.update_status(self._get_label('stats_loaded'))
+        self.root.after(500, lambda: self.show_progress(False))
 
-    def _compute_availability(self, knjiga):
+    def _compute_availability(self, knjига):
         """Одређује статус доступности књиге."""
-        pos = knjiga.get("Позајмљена", "").strip()
-        vra = knjiga.get("Враћена", "").strip()
+        pos = knjига.get("Позајмљена", "").strip()
+        vra = knjига.get("Враћена", "").strip()
         if not pos or vra:
             return "Доступна"
         return "Није доступна"
 
     def _show_loan_details(self, naslov):
         """Приказује детаље о позајмици за књигу."""
-        details = bib.pretraga_pozajmica(self.putanja, naslov)
+        details = bib.pretraga_pозajmica(self.putanja, naslov)
         if details:
             text = "\n".join(f"{k}: {v}" for k, v in details.items())
         else:
@@ -1200,7 +1935,7 @@ class BibliotekaGUI:
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 if isinstance(data, list) and all(isinstance(item, dict) for item in data):
-                    if bib.sacuvaj_podatke(self.putanja, data):
+                    if bib.sacuvaj_podatке(self.putanja, data):
                         messagebox.showinfo(self._get_label('import_json'), self._get_label('imported_books').format(len(data), path))
                         self.go_back()
                     else:
@@ -1229,212 +1964,137 @@ class BibliotekaGUI:
     # Отвара форму за додавање нове књиге 
     def otvori_dodavanje(self):
         frame = self.create_new_frame()
-        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал",
-          "Колекција", "Издавачи", "ИСБН", "Повез", "Напомена"]
+        fields = ["Наслов", "Писац", "Година издавања", "Жанр", "Серијал", "Колекција", "Издавачи", "ИСБН", "Повез", "Напомена"]
         entries = {}
-        entries_authors = []
-        entries_publishers = []
-        
-        for i, field in enumerate(fields):
-            tk.Label(frame, text=f"{field}:").grid(row=i, column=0, padx=5, pady=5)
+
+        def create_field(field, row):
+            """Helper function to create input fields."""
+            tk.Label(frame, text=f"{field}:").grid(row=row, column=0, padx=5, pady=5)
             if field == "Писац":
-                # Креирамо посебну секцију за ауторе
-                author_section = tk.LabelFrame(frame, text=self._get_label('authors'), padx=2, pady=2)
-                author_section.grid(row=i, column=1, padx=5, pady=5, sticky="nsew")
-                frame.grid_rowconfigure(i, weight=1)
-                frame.grid_columnconfigure(1, weight=1)
-                author_section.grid_rowconfigure(0, weight=1)
-                author_section.grid_columnconfigure(0, weight=1)
-
-                # Use grid for the scrollable frame
-                scrollable_authors = ScrollableFrame(author_section, height=120)
-                scrollable_authors.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-                authors_container = scrollable_authors.get_frame()
-                authors_container.grid_columnconfigure(1, weight=1)
-                entries_authors = []
-
-                def add_author_field(name=""):
-                    row = len(entries_authors)
-                    btn_remove = ttk.Button(authors_container, text="-", width=2, command=lambda r=row: remove_author_field(r))
-                    btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
-                    entry = ttk.Combobox(authors_container, values=pisci, width=25)
-                    entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
-                    entry.insert(0, name)
-                    authors_container.grid_rowconfigure(row, weight=0)
-                    entries_authors.append(entry)
-
-                def remove_author_field(row):
-                    if 0 <= row < len(entries_authors):
-                        entries_authors[row].destroy()
-                        entries_authors.pop(row)
-                        for i, entry in enumerate(entries_authors):
-                            btn = None
-                            for widget in authors_container.grid_slaves(row=i, column=0):
-                                if isinstance(widget, ttk.Button):
-                                    btn = widget
-                                    break
-                            if btn:
-                                btn.grid(row=i, column=0, padx=2, pady=2, sticky="nw")
-                            entry.grid(row=i, column=1, padx=2, pady=2, sticky="ew")
-                    else:
-                        print(f"[DEBUG] Покушај брисања невалидног аутора: {row}")
-
-                # Додај поље за првог аутора
-                add_author_field()
-
-                # Додај контроле за додавање новог аутора
-                add_author_frame = tk.Frame(author_section)
-                add_author_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
-                add_author_frame.grid_columnconfigure(0, weight=1)
-                new_author_entry = ttk.Combobox(add_author_frame, values=pisci, width=25)
-                new_author_entry.grid(row=0, column=0, padx=2, sticky="ew")
-                add_author_frame.grid_columnconfigure(0, weight=1)
-
-                def add_new_author_from_entry():
-                    name = new_author_entry.get().strip()
-                    if name:
-                        add_author_field(name)
-                        new_author_entry.delete(0, tk.END)
-
-                btn_add = ttk.Button(add_author_frame, text="+", width=2, command=add_new_author_from_entry)
-                btn_add.grid(row=0, column=1, padx=2)
-                entries["Писац"] = entries_authors
-                
+                entries[field] = self._create_scrollable_section(frame, row, pisci, "authors")
             elif field == "Издавачи":
-                # Креирамо посебну секцију за издаваче, слично ауторима
-                publisher_section = tk.LabelFrame(frame, text=self._get_label('publishers'), padx=2, pady=2)
-                publisher_section.grid(row=i, column=1, padx=5, pady=5, sticky="nsew")
-                frame.grid_rowconfigure(i, weight=1)
-                frame.grid_columnconfigure(1, weight=1)
-                publisher_section.grid_rowconfigure(0, weight=1)
-                publisher_section.grid_columnconfigure(0, weight=1)
-
-                # Use grid for the scrollable frame
-                scrollable_publishers = ScrollableFrame(publisher_section, height=120)
-                scrollable_publishers.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-                publishers_container = scrollable_publishers.get_frame()
-                # Правилна конфигурација за приказ издавача један испод другог
-                publishers_container.grid_columnconfigure(1, weight=1)
-                # Поставља правилну конфигурацију за вертикални приказ
-                for i in range(10):
-                    publishers_container.grid_rowconfigure(i, weight=0)
-                entries_publishers = []
-
-                def add_publisher_field(name=""):
-                    row = len(entries_publishers)
-                    btn_remove = ttk.Button(publishers_container, text="-", width=2, command=lambda r=row: remove_publisher_field(r))
-                    btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
-                    entry = ttk.Combobox(publishers_container, values=izdavac, width=25)
-                    entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
-                    entry.insert(0, name)
-                    publishers_container.grid_rowconfigure(row, weight=0)
-                    entries_publishers.append(entry)
-
-                def remove_publisher_field(row):
-                    if 0 <= row < len(entries_publishers):
-                        entries_publishers[row].destroy()
-                        entries_publishers.pop(row)
-                        for i, entry in enumerate(entries_publishers):
-                            btn = None
-                            for widget in publishers_container.grid_slaves(row=i, column=0):
-                                if isinstance(widget, ttk.Button):
-                                    btn = widget
-                                    break
-                            if btn:
-                                btn.grid(row=i, column=0, padx=2, pady=2, sticky="nw")
-                            entry.grid(row=i, column=1, padx=2, pady=2, sticky="ew")
-                    else:
-                        print(f"[DEBUG] Покушај брисања невалидног издавача: {row}")
-
-                # Додај поље за првог издавача
-                add_publisher_field()
-
-                # Додај контроле за додавање новог издавача
-                add_publisher_frame = tk.Frame(publisher_section)
-                add_publisher_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
-                add_publisher_frame.grid_columnconfigure(0, weight=1)
-                new_publisher_entry = ttk.Combobox(add_publisher_frame, values=izdavac, width=25)
-                new_publisher_entry.grid(row=0, column=0, padx=2, sticky="ew")
-                add_publisher_frame.grid_columnconfigure(0, weight=1)
-
-                def add_new_publisher_from_entry():
-                    name = new_publisher_entry.get().strip()
-                    if name:
-                        add_publisher_field(name)
-                        new_publisher_entry.delete(0, tk.END)
-
-                btn_add = ttk.Button(add_publisher_frame, text="+", width=2, command=add_new_publisher_from_entry)
-                btn_add.grid(row=0, column=1, padx=2)
-                entries[field] = entries_publishers
-                
-            elif field == "Жанр":
-                # За претрагу користимо обичан Combobox
-                combo = ttk.Combobox(frame, values=zanr)
-                combo.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
+                entries[field] = self._create_scrollable_section(frame, row, izdavac, "publishers")
+            elif field in ["Жанр", "Повез"]:
+                combo = ttk.Combobox(frame, values=zanr if field == "Жанр" else povez)
+                combo.grid(row=row, column=1, padx=5, pady=5, sticky="ew")
                 entries[field] = combo
-            elif field == "Повез":
-                entry = ttk.Combobox(frame, values=povez, width=25)
-                entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
-                entries[field] = entry
             else:
                 entry = tk.Entry(frame)
-                entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
+                entry.grid(row=row, column=1, padx=5, pady=5, sticky="ew")
                 entries[field] = entry
-        # Додаје дугме за чување нове књиге
+
+        for i, field in enumerate(fields):
+            create_field(field, i)
+
         def sacuvaj():
-            global zanr, izdavac, pisci
-            # Construct new book data including dynamic authors
             nova_knjiga = {}
             for field in fields:
                 if field == "Писац":
-                    # Прикупи све ауторе из појединачних поља и споји их са тачка-запетом
-                    authors = [e.get() for e in entries_authors if e.get().strip()]
+                    # Prikupljamo sve unesene pisce
+                    authors = [e.get() for e in entries[field] if e.get().strip()]
                     nova_knjiga[field] = "; ".join(authors)
                 elif field == "Издавачи":
-                    # Прикупи све издаваче из појединачних поља и споји их са тачка-запетом
-                    publishers = [e.get() for e in entries_publishers if e.get().strip()]
-                    # Чувамо у поље "Издавач" за компатибилност са CSV
+                    # Prikupljamo sve unesene izdavače
+                    publishers = [e.get() for e in entries[field] if e.get().strip()]
+                    # Čuvamo u polje "Издавач" za kompatibilnost sa CSV
                     nova_knjiga["Издавач"] = "; ".join(publishers)
-                elif field in ["Жанр", "Повез"]:
-                    val = entries[field].get() if hasattr(entries[field], 'get') else entries[field].get()
-                    nova_knjiga[field] = val
-                elif hasattr(entries[field], 'get'):
-                    nova_knjiga[field] = entries[field].get()
                 else:
-                    widget = entries[field]
-                    value = widget.get() if hasattr(widget, 'get') else widget
-                    if field in ["Наслов", "Година издавања"] and not value:
-                        messagebox.showerror(self._get_label('error'), f"Поље '{field}' је обавезно!")
-                        return
-                    if field == "Година издавања" and value and not value.isdigit():
-                        messagebox.showerror(self._get_label('error'), "Година мора бити број!")
-                        return
-                    nova_knjiga[field] = value
+                    # Za ostala polja uzimamo vrednost direktno
+                    if hasattr(entries[field], 'get'):
+                        nova_knjiga[field] = entries[field].get()
+                    else:
+                        nova_knjiga[field] = entries[field]
             
-            # Провера обавезних поља
-            for obavezno_polje in ["Наслов", "Писац"]:
-                if not nova_knjiga.get(obavezno_polje):
-                    messagebox.showerror(self._get_label('error'), f"Поље '{obavezno_polje}' је обавезно!")
-                    return
-                
-            if bib.dodaj_knjigu(self.putanja, nova_knjiga):
-                # Ажурирамо глобалне листе након додавања
-                global zanr, izdavac, pisci
-                # Ажурирамо регистар писаца и друге податке
-                if hasattr(bib, 'inicijalizuj_podatke'):
-                    azurirani_podaci = bib.inicijalizuj_podatke(self.putanja)
-                    zanr = azurirani_podaci['zanr']
-                    izdavac = azurirani_podaci['izdavac']
-                    pisci = azurirani_podaci['pisci']
-                messagebox.showinfo(self._get_label('success'), self._get_label('book_added'))
-                self.go_back()
+            # Dodajemo knjigu
+            if nova_knjiga["Наслов"]:
+                uspeh = bib.dodaj_knjigu(self.putanja, nova_knjiga)
+                if uspeh:
+                    messagebox.showinfo(self._get_label('success'), self._get_label('book_added'))
+                    # Ažuriramo liste za žanr, izdavače i pisce
+                    if hasattr(bib, 'inicijalizuj_podatke'):
+                        azurirani_podaci = bib.inicijalizuj_podatke(self.putanja)
+                        global zanr, izdavac, pisci
+                        zanr = azurirani_podaci['zanr']
+                        izdavac = azurirani_podaci['izdavac']
+                        pisci = azurirani_podaci['pisci']
+                    self.go_back()
+                else:
+                    messagebox.showerror(self._get_label('error'), self._get_label('error_adding_book'))
             else:
-                messagebox.showerror(self._get_label('error'), self._get_label('error_adding_book'))
-        
-        # Save button always at the bottom
-        btn_save = tk.Button(frame, text=self._get_label('save'), command=sacuvaj)
-        btn_save.grid(row=len(fields), column=0, columnspan=3, pady=10, sticky="ew")
+                messagebox.showerror(self._get_label('error'), self._get_label('title_required'))
+
+        tk.Button(frame, text=self._get_label('save'), command=sacuvaj).grid(row=len(fields), column=0, columnspan=2, pady=10, sticky="ew")
         self.show_frame(frame)
+
+    def _create_scrollable_section(self, parent, row, values, label):
+        """Helper function to create a scrollable section for authors or publishers."""
+        section = tk.LabelFrame(parent, text=self._get_label(label), padx=2, pady=2)
+        section.grid(row=row, column=1, padx=5, pady=5, sticky="nsew")
+        parent.grid_rowconfigure(row, weight=1)
+        parent.grid_columnconfigure(1, weight=1)
+        section.grid_rowconfigure(0, weight=1)
+        section.grid_columnconfigure(0, weight=1)
+        
+        # Scrollable frame za unose
+        scrollable = ScrollableFrame(section, height=120)
+        scrollable.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        container = scrollable.get_frame()
+        container.grid_columnconfigure(1, weight=1)
+        entries = []
+
+        def add_field(name=""):
+            row = len(entries)
+            btn_remove = ttk.Button(container, text="-", width=2, command=lambda r=row: remove_field(r))
+            btn_remove.grid(row=row, column=0, padx=2, pady=2, sticky="nw")
+            entry = ttk.Combobox(container, values=values, width=25)
+            entry.grid(row=row, column=1, padx=2, pady=2, sticky="ew")
+            entry.insert(0, name)
+            container.grid_rowconfigure(row, weight=0)
+            entries.append(entry)
+
+        def remove_field(row):
+            if 0 <= row < len(entries):
+                entries[row].destroy()
+                # Pronađi i uništi dugme za brisanje
+                for widget in container.grid_slaves(row=row, column=0):
+                    if isinstance(widget, ttk.Button):
+                        widget.destroy()
+                entries.pop(row)
+                # Ažuriraj pozicije preostalih polja
+                for i, entry in enumerate(entries):
+                    btn = None
+                    for widget in container.grid_slaves(row=i, column=0):
+                        if isinstance(widget, ttk.Button):
+                            btn = widget
+                            break
+                    if btn:
+                        btn.grid(row=i, column=0, padx=2, pady=2, sticky="nw")
+                    entry.grid(row=i, column=1, padx=2, pady=2, sticky="ew")
+            else:
+                print(f"[DEBUG] Pokušaj brisanja nevalidnog polja: {row}")
+
+        # Dodaj prvo polje
+        add_field()
+        
+        # Dodaj sekciju za dodavanje novog polja
+        add_section_frame = tk.Frame(section)
+        add_section_frame.grid(row=1, column=0, sticky="ew", pady=(5,0))
+        add_section_frame.grid_columnconfigure(0, weight=1)
+        new_entry = ttk.Combobox(add_section_frame, values=values, width=25)
+        new_entry.grid(row=0, column=0, padx=2, sticky="ew")
+        
+        # Funkcija za dodavanje novog polja iz unosa
+        def add_new_from_entry():
+            name = new_entry.get().strip()
+            if name:
+                add_field(name)
+                new_entry.delete(0, tk.END)
+        
+        # Dugme za dodavanje novog polja
+        btn_add = ttk.Button(add_section_frame, text="+", width=2, command=add_new_from_entry)
+        btn_add.grid(row=0, column=1, padx=2)
+        
+        return entries
     
     # Отвара форму за претрагу позајмљених књига
     def otvori_pozajmice(self):
@@ -1488,7 +2148,7 @@ class BibliotekaGUI:
             try:
                 df = pd.read_excel(path)
                 data = df.to_dict(orient='records')
-                if bib.sacuvaj_podatke(self.putanja, data):
+                if bib.sacuvaj_podatке(self.putanja, data):
                     messagebox.showinfo(self._get_label('import_excel'), self._get_label('imported_books').format(len(data), path))
                     self.go_back()
                 else:
@@ -1521,18 +2181,18 @@ class ToolTip:
             tw.destroy()
 
 def main(putanja_do_bcsv):
-    # Обезбеђујемо да су сви потребни подаци учитани
+    # Ensure all required data is loaded
     global zanr, izdavac, povez, pisci
     
-    # Иницијализујемо податке из CSV фајла
-    if hasattr(bib, 'inicijalizuj_podatke'):
-        podaci = bib.inicijalizuj_podatke(putanja_do_bcsv)
+    # Initialize data from CSV file
+    if hasattr(bib, 'inicijalizuj_podatке'):  # Fixed function name
+        podaci = bib.inicijalизуј_podatке(putanja_do_bcsv)  # Fixed function call
         zanr = podaci['zanr']
         izdavac = podaci['izdavac']
         povez = podaci['povez']
         pisci = podaci['pisci']
     
-    # Покрени главни прозор
+    # Start main window
     root = tk.Tk()
     app = BibliotekaGUI(root, putanja_do_bcsv)
     root.mainloop()

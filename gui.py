@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+# @Аутор    : minciv
+# @Фајл     : gui.py
+# @Верзија  : 0.2.0
+# @Програм  : Windsurf
+# @Опис     : Основни графички интерфејс за Кућну Библиотеку
+
 import tkinter as tk
 from tkinter import messagebox
 from Biblioteka import ucitaj_podatke, dodaj_knjigu, obrisi_knjigu, pretraga, pretraga_pozajmica
